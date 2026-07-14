@@ -40,6 +40,17 @@ and the community's only window into how carefully the whole thing is built.
    (`raw.api_responses`), plus minimal `meta` bookkeeping (`file_info`,
    `collection_runs`). Typed `state`/`history` tables are a later, distinct milestone —
    don't build them speculatively.
+   Validated with the maintainer (2026-07-14):
+   - `raw.api_responses`: **1 row = 1 HTTP response page** (not exploded per item);
+     columns `run_id, endpoint, entity_luid (nullable, for per-item calls), page,
+     fetched_at, payload JSON` — payload stored already scrubbed.
+   - `identity.map`: **separate typed columns** (`pseudonym PK, user_luid UNIQUE, name,
+     full_name, email, external_auth_user_id, first_seen_run, last_seen_run`), not a
+     JSON blob. Pseudonyms stable forever, lookup key = `user_luid`, table only grows.
+   - `meta.file_info` (single row: site_luid/name, pod, file_created_at,
+     schema_version, is_encrypted) + `meta.collection_runs` (run_id seq PK, timestamps,
+     status running|ok|partial|failed, collector/rest_api/duckdb versions,
+     modules_run[], notes).
 3. **Pseudonymisation is NOT deferred**, and it's mandatory, not best-effort. No real
    identity (LUID, email, fullName, externalAuthUserId, ...) may ever reach
    `raw.api_responses` or any other general table. Design:
@@ -80,16 +91,32 @@ and the community's only window into how carefully the whole thing is built.
    datasources, permissions, etc.) is added. Don't build beyond this slice without
    discussing scope first.
 5. **Testing approach:** a live Tableau Cloud sandbox is available. The maintainer
-   provides `TABHEALTH_PAT` (+ site/pod) as an environment variable in-session when
+   provides `TCA_PAT_SECRET` (+ site/pod) as an environment variable in-session when
    we're ready to test; Claude runs the CLI directly via Bash against the real
    sandbox during development. Never ask for the PAT in chat text — env var only.
-6. **Analyst delivery = redacted DuckDB copy, not parquet.** The future "export for
+6. **Naming: CLI command is `tca`**, package name `tableau-cloud-audit` (matches the
+   GitHub repo). The docs' `tabhealth` naming is superseded. Trademark disclaimer
+   ("independent, not affiliated with Salesforce/Tableau") goes in the README.
+7. **The package file is encrypted at rest — when a key is provided.** DuckDB (>=1.4)
+   native database encryption (AES, `ENCRYPTION_KEY` on ATTACH) with a user-supplied
+   passphrase via the `TCA_DB_KEY` env var (never in collector.toml). If `TCA_DB_KEY`
+   is **not set**: print a clear warning ("database will not be encrypted") and
+   proceed unencrypted — no interactive prompt, no hard error (maintainer's decision).
+   Rationale for encrypting: the in-file `identity` table holds real names/emails; a
+   stolen laptop / cloud-synced backup must not expose them. Trade-off accepted: an
+   encrypted file is not openable with a bare `duckdb file.duckdb` — inspection goes
+   through the CLI (or document the ATTACH+key incantation).
+8. **Pseudonymisation scope (MVP): users only.** User LUID/name/email/
+   externalAuthUserId → `U-####`. Group names stay in the clear (they encode
+   departments — needed for cost-per-BU analysis), as do project/workbook names.
+   Optional group pseudonymisation (`G-####`) is possible later for sensitive clients.
+9. **Analyst delivery = redacted DuckDB copy, not parquet.** The future "export for
    analyst" step is a copy of the package file with the `identity` schema dropped.
    Parquet export stays in the backlog only as an escape hatch for clients with
    "flat files only" security policies — do not build it for the MVP. (DuckDB
    storage-format version compatibility is handled by discipline: the DuckDB version
    is recorded per run in `meta.collection_runs`.)
-7. **Post-scrub safety net (mandatory).** Manifest coverage is the leak surface: user
+10. **Post-scrub safety net (mandatory).** Manifest coverage is the leak surface: user
    LUIDs/names appear not only in `/users` but as `owner.id`/`owner.name` across
    workbooks, datasources, projects, permissions... A missing manifest entry must fail
    loudly, not silently write PII. Before any payload is written, assert the sanitized
@@ -121,8 +148,10 @@ and the community's only window into how carefully the whole thing is built.
   `tca-documentation/Collector_Software_Architecture.md` §1 for why), **duckdb**,
   **typer** (CLI), **pydantic** (config), **rich** (console output). Keep the runtime
   dependency list short — this tool touches an admin PAT and gets security-reviewed.
-- venv vs `uv`: not yet decided at time of writing — check with maintainer before
-  scaffolding `pyproject.toml` / dev environment if this note is still here.
+- Environment: **standard `venv`** (`python3 -m venv .venv`), decided over uv for now;
+  migration to uv possible later if contributor workflow demands it.
+- License: **Apache-2.0** confirmed ("per ora ok") — add the LICENSE file with the
+  first code commit.
 
 ## Conventions
 
@@ -174,7 +203,7 @@ tabhealth summary              # row counts / run info
 tabhealth resolve U-0341       # pseudonym -> identity (reads the identity table)
 ```
 
-PAT only via `TABHEALTH_PAT` env var — never in config, never in the file.
+PAT only via the `TCA_PAT_SECRET` env var — never in config, never in the file.
 
 ## Configuration (`collector.toml`)
 
@@ -188,7 +217,16 @@ pat_name = "tabhealth-collector"
 database = "acme-industries.duckdb"   # user-chosen; path relative to config file, or absolute
 ```
 
-The PAT **secret** is never in this file — `TABHEALTH_PAT` env var only.
+The PAT **secret** is never in this file — env var only.
+
+**Env vars** (aligned with the `tca` CLI name; the docs' `TABHEALTH_*` names are superseded):
+- `TCA_PAT_SECRET` — the PAT secret (required for `collect`/`verify`)
+- `TCA_DB_KEY` — passphrase for DuckDB file encryption (optional; missing → warn + write unencrypted)
+
+**Default file locations**: `collector.toml` and the `.duckdb` file live in the current
+working directory (where the user runs `tca init`) — no hidden folders in `$HOME`.
+
+**Package author metadata** (pyproject): Nicola Simboli, nicola.simboli@gmail.com (for now).
 
 ## Workflow with the maintainer
 
@@ -196,6 +234,9 @@ The PAT **secret** is never in this file — `TABHEALTH_PAT` env var only.
 - **Proactively suggest when to commit and propose the commit message** (Conventional
   Commits format) — the maintainer asked to be prompted rather than having to remember.
 - Don't start building features beyond the agreed scope without discussing first.
+- **Keep `docs/api-coverage.md` updated**: it tracks every API endpoint we call or plan
+  to call, with implementation status. Update it in the same commit that implements
+  (or drops) an endpoint.
 
 ## Status
 
