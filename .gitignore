@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Site-specific local files — never commit client data or config
+*.duckdb
+*.duckdb.wal
+collector.toml
+.env
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

@@ -1,0 +1,26 @@
+# tableau-cloud-audit — collector configuration
+#
+# Copy this file to `collector.toml` and fill in your site details.
+# `tca init` generates it for you interactively.
+#
+# SECRETS DO NOT BELONG HERE. The PAT secret and the optional database
+# encryption passphrase are environment variables only:
+#   TCA_PAT_SECRET  — your Personal Access Token secret (required)
+#   TCA_DB_KEY      — passphrase to encrypt the DuckDB file (optional;
+#                     if unset, the file is written unencrypted and a
+#                     warning is printed)
+
+# Your Tableau Cloud site name — the part after /site/ in your browser URL.
+site = "your-site-name"
+
+# Your pod hostname — the first part of your Tableau Cloud URL,
+# e.g. "eu-west-1a" for https://eu-west-1a.online.tableau.com
+pod = "eu-west-1a"
+
+# The NAME of the Personal Access Token (not the secret!), as shown in
+# Tableau Cloud under My Account Settings > Personal Access Tokens.
+pat_name = "tca-collector"
+
+# The DuckDB package file the collector writes to. Relative paths are
+# resolved against this config file's directory.
+database = "your-site-name.duckdb"

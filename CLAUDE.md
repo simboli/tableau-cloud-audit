@@ -171,9 +171,9 @@ and the community's only window into how carefully the whole thing is built.
 ## Repo layout (target — not all built yet)
 
 ```
-src/tabhealth/
+src/tca/              # python package named after the CLI (`tca`)
   cli.py              # typer app: init, collect, verify, summary, resolve
-  config.py           # pydantic settings: collector.toml (tomllib) + TABHEALTH_PAT env
+  config.py           # pydantic settings: collector.toml (tomllib) + TCA_* env vars
   transport/          # NOT named `http/` — avoids shadowing/confusion with stdlib http
     client.py         # httpx wrapper: auth header, retry/backoff, pagination
     auth.py           # PAT sign-in, silent re-auth (~4h sliding token)
@@ -240,6 +240,8 @@ working directory (where the user runs `tca init`) — no hidden folders in `$HO
 
 ## Status
 
-Design/architecture conversation only so far — **no code written yet**. Do not start
-implementing until explicitly told to; this file should be updated as decisions are
-made, ahead of or alongside the code.
+Development started 2026-07-14 after the design phase was validated. Build order:
+(1) scaffolding, (2) storage layer, (3) pseudonymizer, (4) transport, (5) rest_core
+module + CLI, (6) e2e tests + live sandbox test. One commit per step — **the
+maintainer commits personally**; propose the commit message, never run `git commit`.
+Keep this file and `docs/api-coverage.md` in sync with reality as steps complete.
