@@ -1,0 +1,204 @@
+# tableau-cloud-audit — the open-source Tableau Cloud collector
+
+## What this repo is (and isn't)
+
+This repo is **only the collector** — the open-source, client-executed extractor that
+reads a Tableau Cloud site via PAT and writes a local DuckDB **package file**.
+
+It is **not** the analysis engine. Effective-permission resolution, usage tiering,
+duplicate clustering, scoring, and findings generation are proprietary and live in a
+separate, private repo, developed later. If a change would let a reader learn *how a
+site gets evaluated*, it does not belong here.
+
+Full product context (why this exists, the trust-boundary architecture, the analyst-side
+DuckDB schema, the report deliverables) lives in `../tca-documentation/` — read that for
+background, but note it describes the *whole* product; this repo implements only the
+client-side slice of it. Treat everything below as **overriding** that documentation
+where they conflict — these are the decisions actually taken for this repo.
+
+## Language convention
+
+Conversation with the maintainer happens in Italian. Everything that ships in the repo —
+code, identifiers, comments, docstrings, commit messages, CLI output strings, docs — is
+**English only**.
+
+## The ambition
+
+This is a public open-source project. The bar isn't "it works" — it's that someone
+stumbling on the repo thinks "wow, this is nice" (polished README, clean CLI UX via
+`rich`, clear docs, tests, sensible error messages). Sweat the presentation, not just
+the mechanics — this is the free/trust-building half of the product, it's the client's
+and the community's only window into how carefully the whole thing is built.
+
+## Architecture decisions for this repo (in the order we reached them)
+
+1. **Collector-only.** No `derived`/analysis logic, ever, in this repo.
+2. **MVP storage simplification:** the full typed `state`/`history` schema from
+   `tca-documentation/sql/collector_package_schema.sql` (with mechanical logic like
+   formula normalisation/hashing, event-class collapsing, path materialisation) is
+   **deferred**. For now the collector lands **raw API payloads** into a `raw` schema
+   (`raw.api_responses`), plus minimal `meta` bookkeeping (`file_info`,
+   `collection_runs`). Typed `state`/`history` tables are a later, distinct milestone —
+   don't build them speculatively.
+3. **Pseudonymisation is NOT deferred**, and it's mandatory, not best-effort. No real
+   identity (LUID, email, fullName, externalAuthUserId, ...) may ever reach
+   `raw.api_responses` or any other general table. Design:
+   - **Single identity table**, inside the *same* package `.duckdb` file (not a
+     separate file/companion — this was explicitly decided over the alternative of a
+     physically separate, ATTACHed `identity.duckdb`). This one table —
+     `identity.map` (or similar; finalize in schema.sql) — is the **only** place real
+     names/emails/LUIDs may appear, keyed by a stable pseudonym (`U-####`).
+   - Everywhere else in the file, only `user_pseudo` appears — never the raw user LUID,
+     name, or email.
+   - **Known architectural debt, intentional and accepted:** because identity now lives
+     *inside* the shippable package file rather than in a separate file that never
+     leaves the client, this file is **not yet safe to hand to an analyst as-is**. A
+     future "export for analyst" step (parquet export or a redacted DB copy that drops
+     the `identity` schema) is required before this file may ever cross the client→
+     analyst trust boundary. **Do not forget this when the export/delivery feature is
+     eventually built** — until it exists, this package file must never leave the
+     client machine.
+   - **Mechanism — write-time scrubbing, not export-time filtering.** We considered
+     "land everything raw, filter PII only on export" and rejected it: the package file
+     is explicitly long-lived (reused run after run, accumulating history across
+     months), so PII sitting in it at rest for months is a much bigger liability than a
+     redaction step could offset, and it breaks the "client can inspect the file before
+     sending" trust story. Instead, pseudonymisation is a **mandatory gate in the write
+     path**: nothing reaches `storage/writer.py` without being scrubbed first.
+   - **How scrubbing works without becoming "analysis logic":** each REST endpoint
+     ships a small **declarative identity-field manifest** (e.g. a dict/YAML mapping
+     endpoint → list of JSONPath-like field locations: `/users` →
+     `["$.id", "$.name", "$.email", "$.fullName"]`, `/workbooks` →
+     `["$.owner.id", "$.owner.name"]`). This is I/O-contract metadata, not business
+     logic — it says *where* personal fields live in a given endpoint's shape, it
+     doesn't decide anything. The pseudonymiser reads the manifest, scrubs matching
+     fields, upserts real↔pseudonym pairs into the `identity` table, and only then
+     hands the sanitized payload to the writer.
+4. **MVP endpoint scope: identity core only.** First working vertical slice = `/users`,
+   `/groups`, `/groups/{id}/users` (group membership). This validates the entire chain
+   — auth, pagination, scrubbing, writing — before content inventory (workbooks,
+   datasources, permissions, etc.) is added. Don't build beyond this slice without
+   discussing scope first.
+5. **Testing approach:** a live Tableau Cloud sandbox is available. The maintainer
+   provides `TABHEALTH_PAT` (+ site/pod) as an environment variable in-session when
+   we're ready to test; Claude runs the CLI directly via Bash against the real
+   sandbox during development. Never ask for the PAT in chat text — env var only.
+6. **Analyst delivery = redacted DuckDB copy, not parquet.** The future "export for
+   analyst" step is a copy of the package file with the `identity` schema dropped.
+   Parquet export stays in the backlog only as an escape hatch for clients with
+   "flat files only" security policies — do not build it for the MVP. (DuckDB
+   storage-format version compatibility is handled by discipline: the DuckDB version
+   is recorded per run in `meta.collection_runs`.)
+7. **Post-scrub safety net (mandatory).** Manifest coverage is the leak surface: user
+   LUIDs/names appear not only in `/users` but as `owner.id`/`owner.name` across
+   workbooks, datasources, projects, permissions... A missing manifest entry must fail
+   loudly, not silently write PII. Before any payload is written, assert the sanitized
+   JSON contains no email-pattern matches and no LUID already present in the `identity`
+   table; a match is a **blocking error**, never a warning.
+
+## Known limitations (declare, don't hide — goes in SECURITY.md / what-we-collect.md)
+
+- **Free-text fields** (workbook descriptions, project names, comments) can contain
+  person names; not mechanically solvable — documented limitation, and one more reason
+  the safety-net regex check exists.
+- **Pseudonym stability lives in the package file.** `U-####` mapping is stored in the
+  in-file `identity` table: delete the file and pseudonyms regenerate, breaking
+  cross-run comparability. Document clearly: "the file is your archive, don't delete it".
+- **DuckDB is single-writer**: two concurrent `collect` runs on the same file must fail
+  with a clear error message, not a cryptic lock error.
+- **PAT session token expires (~4h sliding)**: silent re-auth belongs in the transport
+  layer from day one, long runs depend on it.
+
+## Stack & versions
+
+- **Python**: developed/tested with whatever is locally installed (3.13 is available
+  on this machine) — no reason not to use it, nothing here needs bleeding-edge
+  features. Declared package compatibility floor: `requires-python = ">=3.11"` (matches
+  the original spec, maximizes adoption in enterprise/IT environments that may lag on
+  Python versions). Note: `tomllib` (stdlib TOML parsing) is available from 3.11
+  onward, so no extra dependency needed for reading `collector.toml`.
+- **httpx** (own client, not `tableauserverclient` — see
+  `tca-documentation/Collector_Software_Architecture.md` §1 for why), **duckdb**,
+  **typer** (CLI), **pydantic** (config), **rich** (console output). Keep the runtime
+  dependency list short — this tool touches an admin PAT and gets security-reviewed.
+- venv vs `uv`: not yet decided at time of writing — check with maintainer before
+  scaffolding `pyproject.toml` / dev environment if this note is still here.
+
+## Conventions
+
+| Area | Convention |
+|---|---|
+| Formatter/linter | **ruff** (format + lint in one tool) |
+| Type hints | Always on public function signatures; type-checked in CI (mypy or pyright) |
+| Docstrings | Only on public API surface (CLI commands, module entry points) — no comments/docstrings on obvious internal code |
+| Tests | **pytest**, one test file per module, mirroring `src/` structure |
+| Commit messages | Conventional Commits (`feat:`, `fix:`, `docs:`, `test:`, ...) |
+| Line length | 100 (via ruff) |
+| Imports | Absolute from `tabhealth.*`, no deep relative imports |
+| Error handling | Fail loud — no silent `except: pass`; network/auth errors propagate with a clear `rich`-formatted message |
+| Secrets | Never log or print the PAT, including in HTTP debug/error output — mask it |
+| Naming/comments/docs | English only, always (see Language convention above) |
+
+## Repo layout (target — not all built yet)
+
+```
+src/tabhealth/
+  cli.py              # typer app: init, collect, verify, summary, resolve
+  config.py           # pydantic settings: collector.toml (tomllib) + TABHEALTH_PAT env
+  transport/          # NOT named `http/` — avoids shadowing/confusion with stdlib http
+    client.py         # httpx wrapper: auth header, retry/backoff, pagination
+    auth.py           # PAT sign-in, silent re-auth (~4h sliding token)
+  sources/
+    rest.py           # REST endpoint wrappers (dumb transport, typed responses)
+  modules/
+    base.py           # Module protocol: name, requires[], run(ctx)
+    rest_core.py       # MVP: users, groups, group membership (expand later)
+  pseudo/
+    manifest.py        # THE declarative endpoint -> PII-field-paths map, in one
+    #                    readable place (a security reviewer must find "what counts
+    #                    as PII per endpoint" here, and only here)
+    scrubber.py        # manifest-driven scrub gate + identity upserts + safety net
+  storage/
+    schema.sql         # meta + raw + identity (see architecture decisions above)
+    writer.py           # one tx per run
+tests/
+```
+
+## CLI surface (target)
+
+```
+tabhealth init                 # wizard -> collector.toml + empty .duckdb file
+tabhealth collect [--modules …]
+tabhealth verify               # PAT works? site reachable?
+tabhealth summary              # row counts / run info
+tabhealth resolve U-0341       # pseudonym -> identity (reads the identity table)
+```
+
+PAT only via `TABHEALTH_PAT` env var — never in config, never in the file.
+
+## Configuration (`collector.toml`)
+
+Non-secret settings live in `collector.toml` next to the package file. Keys agreed so
+far (the `init` wizard proposes sensible defaults):
+
+```toml
+site = "acme-industries"
+pod = "eu-west"
+pat_name = "tabhealth-collector"
+database = "acme-industries.duckdb"   # user-chosen; path relative to config file, or absolute
+```
+
+The PAT **secret** is never in this file — `TABHEALTH_PAT` env var only.
+
+## Workflow with the maintainer
+
+- Conversation in Italian; repo content in English (see Language convention).
+- **Proactively suggest when to commit and propose the commit message** (Conventional
+  Commits format) — the maintainer asked to be prompted rather than having to remember.
+- Don't start building features beyond the agreed scope without discussing first.
+
+## Status
+
+Design/architecture conversation only so far — **no code written yet**. Do not start
+implementing until explicitly told to; this file should be updated as decisions are
+made, ahead of or alongside the code.
