@@ -25,6 +25,7 @@ from tca.config import (
     pat_secret,
 )
 from tca.modules import base as modules_base
+from tca.modules.content import ContentModule  # noqa: F401  (registers itself)
 from tca.modules.rest_core import RestCoreModule  # noqa: F401  (registers itself)
 from tca.pseudo.scrubber import Scrubber, ScrubError
 from tca.sources.rest import TableauRest
@@ -184,7 +185,7 @@ def verify(config: Path = CONFIG_OPTION) -> None:
 def collect(
     config: Path = CONFIG_OPTION,
     modules: str = typer.Option(
-        "rest_core", "--modules", "-m", help="Comma-separated module names."
+        "rest_core,content", "--modules", "-m", help="Comma-separated module names."
     ),
 ) -> None:
     """Run a collection: fetch, pseudonymise, land into the package file."""

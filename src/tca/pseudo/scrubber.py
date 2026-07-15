@@ -47,6 +47,8 @@ class Scrubber:
         for path in spec.user_paths:
             for user_obj in _iter_objects(sanitized, path):
                 self._pseudonymise(user_obj, endpoint=endpoint, path=path)
+        for path in spec.redact_paths:
+            _redact(sanitized, path)
         self._safety_net(endpoint, sanitized)
         return sanitized
 
@@ -93,6 +95,16 @@ class Scrubber:
 def _get_str(obj: dict[str, Any], key: str) -> str | None:
     value = obj.get(key)
     return value if isinstance(value, str) and value else None
+
+
+def _redact(payload: dict[str, Any], path: str) -> None:
+    """Replace the scalar at ``path`` (e.g. 'connections.connection[*].userName')
+    with '[redacted]' wherever it is present and non-empty."""
+    parent_path, _, field_name = path.rpartition(".")
+    for obj in _iter_objects(payload, parent_path):
+        value = obj.get(field_name)
+        if isinstance(value, str) and value:
+            obj[field_name] = "[redacted]"
 
 
 def _iter_objects(payload: Any, path: str) -> Iterator[dict[str, Any]]:

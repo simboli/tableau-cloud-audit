@@ -35,9 +35,17 @@ USER_IDENTITY_FIELDS: tuple[str, ...] = (
 
 @dataclass(frozen=True)
 class EndpointSpec:
-    """What the scrubber needs to know about one endpoint."""
+    """What the scrubber needs to know about one endpoint.
+
+    ``user_paths`` locate Tableau *user objects* (pseudonymised via the vault).
+    ``redact_paths`` locate scalar fields that may identify a person but are
+    NOT Tableau users (e.g. database credential usernames): they carry no LUID
+    to map, so their value is replaced with ``[redacted]`` — presence is
+    preserved, identity is not.
+    """
 
     user_paths: list[str] = field(default_factory=list)
+    redact_paths: list[str] = field(default_factory=list)
 
 
 # Endpoint keys are the *templates* used by the modules (concrete LUIDs are
@@ -49,4 +57,19 @@ MANIFEST: dict[str, EndpointSpec] = {
     "/users": EndpointSpec(user_paths=["users.user[*]"]),
     "/groups": EndpointSpec(),  # group names stay in the clear by design
     "/groups/{luid}/users": EndpointSpec(user_paths=["users.user[*]"]),
+    # -- content inventory ----------------------------------------------------
+    # Owners are Tableau user objects nested in each content item; project,
+    # workbook and datasource NAMES stay in the clear by design.
+    "/projects": EndpointSpec(user_paths=["projects.project[*].owner"]),
+    "/workbooks": EndpointSpec(user_paths=["workbooks.workbook[*].owner"]),
+    "/views": EndpointSpec(user_paths=["views.view[*].owner"]),
+    "/datasources": EndpointSpec(user_paths=["datasources.datasource[*].owner"]),
+    # Connection userName is the DATABASE credential user (often a personal
+    # account, no Tableau LUID): redacted, keeping the presence signal.
+    "/workbooks/{luid}/connections": EndpointSpec(
+        redact_paths=["connections.connection[*].userName"]
+    ),
+    "/datasources/{luid}/connections": EndpointSpec(
+        redact_paths=["connections.connection[*].userName"]
+    ),
 }

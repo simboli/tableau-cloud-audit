@@ -91,7 +91,7 @@ def test_groups_pass_through_untouched(scrubber: Scrubber) -> None:
 
 def test_unregistered_endpoint_is_refused(scrubber: Scrubber) -> None:
     with pytest.raises(ScrubError, match="not registered"):
-        scrubber.scrub("/workbooks", {"workbooks": {}})
+        scrubber.scrub("/flows", {"flows": {}})
 
 
 def test_user_object_without_id_is_refused(scrubber: Scrubber) -> None:
@@ -122,3 +122,37 @@ def test_single_object_instead_of_list(scrubber: Scrubber) -> None:
 
 def test_empty_page_is_fine(scrubber: Scrubber) -> None:
     assert scrubber.scrub("/users", {"users": {}}) == {"users": {}}
+
+
+def test_nested_owner_is_pseudonymised(scrubber: Scrubber) -> None:
+    wb_page = {
+        "workbooks": {
+            "workbook": [
+                {
+                    "id": "wb-1",
+                    "name": "Sales",
+                    "owner": {"id": "aa11bb22-0000-1111-2222-333344445555", "name": "m@acme.it"},
+                }
+            ]
+        }
+    }
+    out = scrubber.scrub("/workbooks", wb_page)
+    owner = out["workbooks"]["workbook"][0]["owner"]
+    assert owner["id"] == owner["name"] == "U-0001"
+    assert out["workbooks"]["workbook"][0]["name"] == "Sales"  # content name in clear
+
+
+def test_connection_username_is_redacted(scrubber: Scrubber) -> None:
+    payload = {
+        "connections": {
+            "connection": [
+                {"id": "c-1", "userName": "personal.user@acme.it", "serverAddress": "db"},
+                {"id": "c-2", "userName": "", "serverAddress": "db2"},
+            ]
+        }
+    }
+    out = scrubber.scrub("/workbooks/{luid}/connections", payload)
+    c1, c2 = out["connections"]["connection"]
+    assert c1["userName"] == "[redacted]"  # presence preserved, identity gone
+    assert c2["userName"] == ""  # empty stays empty (absence signal)
+    assert c1["serverAddress"] == "db"

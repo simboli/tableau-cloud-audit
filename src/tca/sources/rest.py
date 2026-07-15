@@ -16,6 +16,12 @@ from tca.transport.client import RestClient
 USERS = "/users"
 GROUPS = "/groups"
 GROUP_USERS = "/groups/{luid}/users"
+PROJECTS = "/projects"
+WORKBOOKS = "/workbooks"
+VIEWS = "/views"
+DATASOURCES = "/datasources"
+WORKBOOK_CONNECTIONS = "/workbooks/{luid}/connections"
+DATASOURCE_CONNECTIONS = "/datasources/{luid}/connections"
 
 Page = tuple[int, dict[str, Any]]
 
@@ -23,6 +29,8 @@ Page = tuple[int, dict[str, Any]]
 class TableauRest:
     def __init__(self, client: RestClient) -> None:
         self._client = client
+
+    # -- identity core ---------------------------------------------------------
 
     def users(self) -> Iterator[Page]:
         """All site users, all fields (one page = up to 1000 users)."""
@@ -33,3 +41,26 @@ class TableauRest:
 
     def group_users(self, group_luid: str) -> Iterator[Page]:
         return self._client.paginate(GROUP_USERS.replace("{luid}", group_luid))
+
+    # -- content inventory -------------------------------------------------------
+
+    def projects(self) -> Iterator[Page]:
+        return self._client.paginate(PROJECTS)
+
+    def workbooks(self) -> Iterator[Page]:
+        return self._client.paginate(WORKBOOKS, params={"fields": "_all_"})
+
+    def views(self) -> Iterator[Page]:
+        """Views with all-time usage counters (windowed usage comes later, from
+        Admin Insights — the REST counter is all-time only)."""
+        return self._client.paginate(VIEWS, params={"includeUsageStatistics": "true"})
+
+    def datasources(self) -> Iterator[Page]:
+        return self._client.paginate(DATASOURCES, params={"fields": "_all_"})
+
+    def workbook_connections(self, workbook_luid: str) -> dict[str, Any]:
+        """Not paginated: one small response per workbook."""
+        return self._client.get_site(WORKBOOK_CONNECTIONS.replace("{luid}", workbook_luid))
+
+    def datasource_connections(self, datasource_luid: str) -> dict[str, Any]:
+        return self._client.get_site(DATASOURCE_CONNECTIONS.replace("{luid}", datasource_luid))

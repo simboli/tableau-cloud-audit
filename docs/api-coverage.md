@@ -38,12 +38,12 @@ in the pseudonymisation manifest (`pseudo/manifest.py`) before they can be calle
 
 | Endpoint | Method | Purpose | PII | Status |
 |---|---|---|---|---|
-| `/api/{v}/sites/{site}/projects` | GET (paginated) | Project tree, LockedToProject/ManagedByOwner, owners | **yes** (owner) | 📋 planned |
-| `/api/{v}/sites/{site}/workbooks?fields=_all_` | GET (paginated) | Workbooks: owner, project, size, updatedAt, tags | **yes** (owner) | 📋 planned |
-| `/api/{v}/sites/{site}/views?includeUsageStatistics=true` | GET (paginated) | Views + all-time view counts | — | 📋 planned |
-| `/api/{v}/sites/{site}/datasources?fields=_all_` | GET (paginated) | Data sources: isCertified, hasExtracts, owner | **yes** (owner) | 📋 planned |
-| `/api/{v}/sites/{site}/workbooks/{id}/connections` | GET (per item) | Connection types, servers, embedded credentials | **yes** (connection username presence) | 📋 planned |
-| `/api/{v}/sites/{site}/datasources/{id}/connections` | GET (per item) | Same, for data sources | **yes** | 📋 planned |
+| `/api/{v}/sites/{site}/projects` | GET (paginated) | Project tree, LockedToProject/ManagedByOwner, owners | **yes** (owner → U-####) | ✅ implemented (`content` module) |
+| `/api/{v}/sites/{site}/workbooks?fields=_all_` | GET (paginated) | Workbooks: owner, project, size, updatedAt, tags | **yes** (owner → U-####) | ✅ implemented (`content` module) |
+| `/api/{v}/sites/{site}/views?includeUsageStatistics=true` | GET (paginated) | Views + all-time view counts | **yes** (owner → U-####) | ✅ implemented (`content` module) |
+| `/api/{v}/sites/{site}/datasources?fields=_all_` | GET (paginated) | Data sources: isCertified, hasExtracts, owner | **yes** (owner → U-####) | ✅ implemented (`content` module) |
+| `/api/{v}/sites/{site}/workbooks/{id}/connections` | GET (per item) | Connection types, servers, embedded credentials | **yes** (credential userName → `[redacted]`, presence kept) | ✅ implemented (`content` module) |
+| `/api/{v}/sites/{site}/datasources/{id}/connections` | GET (per item) | Same, for data sources | **yes** (same redaction) | ✅ implemented (`content` module) |
 | `/api/{v}/sites/{site}/flows` | GET (paginated) | Prep flows inventory | **yes** (owner) | 📋 planned |
 | `/api/{v}/sites/{site}/virtualConnections` | GET (paginated) | Virtual connections (REST is the only inventory) | **yes** (owner) | 💤 backlog |
 

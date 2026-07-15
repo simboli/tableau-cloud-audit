@@ -109,7 +109,8 @@ def test_collect_end_to_end_then_summary_and_resolve(workdir: Path, httpx_mock: 
     mock_signin(httpx_mock)
     mock_collect_endpoints(httpx_mock)
 
-    result = runner.invoke(app, ["collect"])
+    # explicit module list: the content module's endpoints are not mocked here
+    result = runner.invoke(app, ["collect", "--modules", "rest_core"])
     assert result.exit_code == 0, result.output
     assert "run #1" in result.output
     assert "No real identities" in result.output
