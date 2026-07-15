@@ -51,6 +51,11 @@ and the community's only window into how carefully the whole thing is built.
      schema_version, is_encrypted) + `meta.collection_runs` (run_id seq PK, timestamps,
      status running|ok|partial|failed, collector/rest_api/duckdb versions,
      modules_run[], notes).
+   - Timestamps are naive `TIMESTAMP`, always UTC by convention (not TIMESTAMPTZ:
+     fetching TIMESTAMPTZ through the duckdb Python client requires pytz — an extra
+     runtime dep we don't want).
+   - `init_file_info` locks the file to one site: opening it against a different
+     site LUID is a hard error (one package file per site).
 3. **Pseudonymisation is NOT deferred**, and it's mandatory, not best-effort. No real
    identity (LUID, email, fullName, externalAuthUserId, ...) may ever reach
    `raw.api_responses` or any other general table. Design:
