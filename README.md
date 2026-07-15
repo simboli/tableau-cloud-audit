@@ -25,12 +25,13 @@ local DuckDB file — so you can understand optimization opportunities on **econ
 
 ## The DuckDB package file
 
-Everything the collector produces lives in one DuckDB database with **four schemas**:
+Everything the collector produces lives in one DuckDB database with **five schemas**:
 
 | Schema | Contents | PII |
 |---|---|---|
-| **`meta`** | Bookkeeping: file identity (`meta.file_info`), one row per collection run (`meta.collection_runs`), event-coverage windows with gap detection (`meta.event_coverage`) | none |
-| **`raw`** | The actual data: one row per API response page (`raw.api_responses`), payload stored as JSON, **already pseudonymised** | none — user identities appear only as `U-####` |
+| **`meta`** | Bookkeeping: file identity (`meta.file_info`), one row per collection run (`meta.collection_runs`), schema migration registry, event-coverage windows with gap detection | none |
+| **`raw`** | The source of truth: one row per API response page (`raw.api_responses`), payload stored as JSON, **already pseudonymised** | none — user identities appear only as `U-####` |
+| **`state`** | Queryable typed tables (1 row = 1 object: users, groups, projects, content, views, connections, permission rules), rebuilt mechanically from `raw` on every run; `v_*_current` views show the latest snapshot | none |
 | **`history`** | Append-only accumulators deduplicated on natural keys (`history.events`): run the collector monthly and the event log outlives Tableau's 90-day retention | none |
 | **`identity`** | A single table (`identity.map`): the pseudonym ↔ real identity mapping (`U-0042` → name, email, LUID). **The only place real identities exist.** | yes — by design, isolated here |
 

@@ -30,6 +30,7 @@ from tca.modules.activity import ActivityModule  # noqa: F401  (registers itself
 from tca.modules.content import ContentModule  # noqa: F401  (registers itself)
 from tca.modules.permissions import PermissionsModule  # noqa: F401  (registers itself)
 from tca.modules.rest_core import RestCoreModule  # noqa: F401  (registers itself)
+from tca.normalize import normalize_run
 from tca.pseudo.scrubber import Scrubber, ScrubError
 from tca.sources.rest import TableauRest
 from tca.sources.vds import VizqlDataService
@@ -319,6 +320,9 @@ def collect(
                         "tca collect --resume[/yellow]"
                     )
                     raise
+                console.print("[bold]→ normalizing raw pages into state tables[/bold]")
+                state_counts = normalize_run(store, run_id)
+
                 notes = None
                 if denied:
                     notes = f"{len(denied)} item(s) denied (403/404), e.g. Personal Space content"
@@ -331,6 +335,13 @@ def collect(
                         "(403/404) and were skipped — typical for Personal Space "
                         "content; recorded in the run notes.[/yellow]"
                     )
+                if state_counts:
+                    state_table = Table(title="typed state (rebuilt from raw)")
+                    state_table.add_column("table")
+                    state_table.add_column("rows", justify="right")
+                    for name, count in sorted(state_counts.items()):
+                        state_table.add_row(name, str(count))
+                    console.print(state_table)
                 _print_run_report(store, run_id, all_stats, time.monotonic() - started)
         finally:
             client.signout()

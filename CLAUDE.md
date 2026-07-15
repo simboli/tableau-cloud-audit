@@ -295,10 +295,21 @@ failure notes prove necessary). On the sandbox both sources returned an empty
 (all-null single row) extract — Admin Insights refreshes daily, data will
 appear; mechanics verified via unit tests.
 
-Next milestones: typed state layer, clear views / `tca peek`, OSS polish
-(CI, SECURITY.md, what-we-collect.md), remaining VDS backlog sources
-(Groups, Permissions, Subscriptions, Viz Load Times), history accumulation
-for job runs (dedup on Job LUID, like events).
+Done 2026-07-15 (night): **typed state layer** — migration 003 (v0.3) adds the
+`state` schema (users, groups, group_members, projects, unified content_items,
+views, connections, permission_rules — one grantee×capability per rule row)
+plus `meta.v_latest_run` and `state.v_*_current` convenience views.
+`tca/normalize.py` rebuilds state per run FROM the raw pages (delete+insert:
+idempotent, resume-safe; raw stays the source of truth; strictly mechanical —
+no evaluation logic). Runs automatically at the end of every collect. VDS
+pages are not typed yet (state derives from REST endpoints only for now).
+Live sandbox note: `/users` hides Tableau system/service accounts — they
+surface only via group membership; the typed layer reflects endpoint truth.
+
+Next milestones: clear views / `tca peek`, OSS polish (CI, SECURITY.md,
+what-we-collect.md), remaining VDS backlog sources (Groups, Permissions,
+Subscriptions, Viz Load Times), typed state for VDS sources, history
+accumulation for job runs (dedup on Job LUID, like events).
 
 Backlog (agreed with maintainer):
 - **Clear views / `tca peek`**: local-only readable views joining `raw` with

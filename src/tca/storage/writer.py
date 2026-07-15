@@ -29,6 +29,7 @@ from tca import __version__
 MIGRATIONS: tuple[tuple[str, str], ...] = (
     ("0.1", "001_init.sql"),
     ("0.2", "002_event_history.sql"),
+    ("0.3", "003_typed_state.sql"),
 )
 SCHEMA_VERSION = MIGRATIONS[-1][0]
 _CATALOG = "pkg"

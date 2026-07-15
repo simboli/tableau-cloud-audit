@@ -25,14 +25,12 @@ def test_export_copies_everything_but_identity(tmp_path: Path) -> None:
     counts = store.export_redacted(dest)
     store.close()
 
-    assert counts == {
-        "meta.collection_runs": 1,
-        "meta.event_coverage": 0,
-        "meta.file_info": 1,
-        "meta.schema_migrations": 2,
-        "history.events": 0,
-        "raw.api_responses": 1,
-    }
+    # robust to schema growth: core tables present with the right counts,
+    # and nothing from the identity schema ever appears
+    assert counts["meta.file_info"] == 1
+    assert counts["meta.collection_runs"] == 1
+    assert counts["raw.api_responses"] == 1
+    assert not any(table.startswith("identity.") for table in counts)
 
     # opens WITHOUT a key (plain duckdb), identity schema absent, flag updated
     con = duckdb.connect(str(dest), read_only=True)
