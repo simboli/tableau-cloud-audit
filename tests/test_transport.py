@@ -150,7 +150,8 @@ def test_tableau_error_body_is_surfaced(httpx_mock: HTTPXMock) -> None:
 
 def test_signout_clears_token(httpx_mock: HTTPXMock) -> None:
     mock_connect(httpx_mock)
-    httpx_mock.add_response(url=f"{BASE}/api/3.26/auth/signout", json={})
+    # the real Tableau signout replies 204 No Content — no JSON body to parse
+    httpx_mock.add_response(url=f"{BASE}/api/3.26/auth/signout", status_code=204)
     client = make_client()
     client.connect()
     client.signout()

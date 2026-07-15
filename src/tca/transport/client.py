@@ -136,7 +136,15 @@ class RestClient:
                     )
                 raise TransportError(message)
 
-            return dict(response.json())
+            if response.status_code == 204 or not response.content:
+                return {}  # e.g. signout replies 204 No Content
+            try:
+                return dict(response.json())
+            except ValueError as exc:
+                raise TransportError(
+                    f"{method} {url} returned HTTP {response.status_code} with a "
+                    f"non-JSON body: {response.text[:200]!r}"
+                ) from exc
 
     # -- public request surface ----------------------------------------------------
 

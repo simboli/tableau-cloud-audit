@@ -245,8 +245,26 @@ working directory (where the user runs `tca init`) — no hidden folders in `$HO
 
 ## Status
 
-Development started 2026-07-14 after the design phase was validated. Build order:
-(1) scaffolding, (2) storage layer, (3) pseudonymizer, (4) transport, (5) rest_core
-module + CLI, (6) e2e tests + live sandbox test. One commit per step — **the
-maintainer commits personally**; propose the commit message, never run `git commit`.
-Keep this file and `docs/api-coverage.md` in sync with reality as steps complete.
+MVP complete and **verified live** against the maintainer's DataDev sandbox
+(site simbolidev820124, pod 10ax) on 2026-07-15: verify/collect/summary/resolve all
+work end-to-end, the package file is encrypted, and a direct query confirmed zero PII
+in `raw` (identity fields land as U-#### exactly as designed).
+
+Working conventions: **the maintainer commits personally** — propose the commit
+message (Conventional Commits), never run `git commit`. Keep this file and
+`docs/api-coverage.md` in sync with reality.
+
+Live-testing note: secrets are sourced from a local `.env` (gitignored, chmod 600)
+via `source .env && …` when Claude runs the CLI in-session.
+
+Lessons from the live test (already encoded in code/tests):
+- `pod` is the bare pod name only ('10ax'); hostname/URL are rejected with a clear
+  error (maintainer's decision).
+- The site contentUrl may differ from the display name (dashes stripped:
+  'simbolidev820124', not 'simboli-dev-820124') — a wrong site gives Tableau 401001
+  on signin even with a valid PAT.
+- Tableau signout replies 204 No Content; the client treats empty bodies as `{}`.
+
+Next milestones (not started): content inventory endpoints (projects/workbooks/
+datasources — need manifest entries for `owner`), checkpoint/resume, typed
+state/history layer, redacted export for analyst delivery.
