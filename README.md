@@ -67,6 +67,9 @@ Everything lives in one DuckDB database with **five schemas**:
 
 The schema is versioned: opening a file applies pending additive-only migrations
 automatically, and files written by a newer collector are refused rather than mangled.
+Tables and columns never disappear across versions — the guarantee is enforced by a
+schema contract test in CI-to-be. Full table-by-table guide:
+[docs/package-file-schema.md](docs/package-file-schema.md).
 
 Set `TCA_DB_KEY` to encrypt the whole file at rest (DuckDB native AES encryption). If
 unset, the collector warns and writes an unencrypted file.

@@ -238,6 +238,14 @@ working directory (where the user runs `tca init`) — no hidden folders in `$HO
 - **Keep `docs/api-coverage.md` updated**: it tracks every API endpoint we call or plan
   to call, with implementation status. Update it in the same commit that implements
   (or drops) an endpoint.
+- **Keep `docs/package-file-schema.md` updated** when the schema grows (same commit
+  as the migration, like the contract test).
+- **Docs split (maintainer's decision, 2026-07-15):** the collector repo `docs/` holds
+  only PUBLIC docs (schema map, api coverage, future what-we-collect/quickstart) — the
+  basis for a future MkDocs+GitHub Pages site to attract users. Business/IP documents
+  (finding→data spec, system architecture with moat/renewal strategy, the analyst-side
+  `assessment_duckdb_schema.sql`, report mockups) stay in `../tca-documentation/` and
+  must NEVER be committed to this public repo.
 
 ## Status
 
