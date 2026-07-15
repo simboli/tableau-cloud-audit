@@ -90,9 +90,15 @@ def test_init_refuses_overwrite(workdir: Path) -> None:
 def test_verify_happy_path(workdir: Path, httpx_mock: HTTPXMock) -> None:
     write_config(workdir)
     mock_signin(httpx_mock)
+    # no Admin Insights on this fake site -> verify warns but still passes
+    httpx_mock.add_response(
+        url=f"{API}/datasources?pageSize=1000&pageNumber=1",
+        json={"datasources": {"datasource": []}},
+    )
     result = runner.invoke(app, ["verify"])
     assert result.exit_code == 0, result.output
     assert "All checks passed" in result.output
+    assert "Admin Insights datasources not found" in result.output
     assert SITE_LUID in result.output
 
 

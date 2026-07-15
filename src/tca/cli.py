@@ -26,11 +26,13 @@ from tca.config import (
     pat_secret,
 )
 from tca.modules import base as modules_base
+from tca.modules.activity import ActivityModule  # noqa: F401  (registers itself)
 from tca.modules.content import ContentModule  # noqa: F401  (registers itself)
 from tca.modules.permissions import PermissionsModule  # noqa: F401  (registers itself)
 from tca.modules.rest_core import RestCoreModule  # noqa: F401  (registers itself)
 from tca.pseudo.scrubber import Scrubber, ScrubError
 from tca.sources.rest import TableauRest
+from tca.sources.vds import VizqlDataService
 from tca.storage.writer import PackageStore, StorageError
 from tca.transport.auth import Credentials
 from tca.transport.client import RestClient, TransportError
@@ -157,6 +159,7 @@ def verify(config: Path = CONFIG_OPTION) -> None:
                 f"[green]✓[/green] signed in — REST API {client.api_version}, "
                 f"site LUID {client.site_luid}"
             )
+            _verify_admin_insights(client)
             client.signout()
         finally:
             client.close()
@@ -180,6 +183,42 @@ def verify(config: Path = CONFIG_OPTION) -> None:
     console.print("[bold green]All checks passed.[/bold green]")
 
 
+def _verify_admin_insights(client: RestClient) -> None:
+    """Admin Insights + VDS access is the #1 predicted setup failure: check it
+    at verify time, not mid-run. Warns (doesn't fail) — the REST modules work
+    without it, only the activity module would be skipped."""
+    from tca.modules.activity import ADMIN_INSIGHTS_PROJECT, _admin_insights_luids
+    from tca.pseudo.manifest import VDS_MANIFEST
+
+    found: dict[str, str] = {}
+    for _, payload in client.paginate("/datasources"):
+        found.update(_admin_insights_luids(payload))
+    wanted = [spec.datasource_name for spec in VDS_MANIFEST.values()]
+    missing = [name for name in wanted if name not in found]
+    if missing:
+        console.print(
+            f"[yellow]⚠ Admin Insights datasources not found: {', '.join(missing)}. "
+            f"Open the '{ADMIN_INSIGHTS_PROJECT}' project once as an admin to "
+            "provision them; the activity module will skip them until then.[/yellow]"
+        )
+        return
+    try:
+        VizqlDataService(client).field_captions(found[wanted[0]])
+        console.print(
+            f"[green]✓[/green] Admin Insights present ({len(found)} datasources), "
+            "VizQL Data Service reachable"
+        )
+    except TransportError as exc:
+        if exc.status_code in (403, 404):
+            console.print(
+                "[yellow]⚠ Admin Insights found but VDS access was denied — the "
+                "PAT user needs query access on the Admin Insights datasources. "
+                "The activity module will skip them until granted.[/yellow]"
+            )
+        else:
+            raise
+
+
 # ------------------------------------------------------------------- collect
 
 
@@ -187,7 +226,7 @@ def verify(config: Path = CONFIG_OPTION) -> None:
 def collect(
     config: Path = CONFIG_OPTION,
     modules: str = typer.Option(
-        "rest_core,content,permissions",
+        "rest_core,content,permissions,activity",
         "--modules",
         "-m",
         help="Comma-separated module names.",
@@ -254,6 +293,7 @@ def collect(
                         f"  [dim]{endpoint} — page {page}[/dim]"
                     ),
                     done=done,
+                    vds=VizqlDataService(client),
                 )
                 all_stats: dict[str, int] = {}
                 skipped = 0

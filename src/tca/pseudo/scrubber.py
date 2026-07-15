@@ -18,7 +18,7 @@ import re
 from collections.abc import Iterator
 from typing import Any
 
-from tca.pseudo.manifest import MANIFEST, USER_IDENTITY_FIELDS
+from tca.pseudo.manifest import MANIFEST, USER_IDENTITY_FIELDS, VDS_MANIFEST, VdsSourceSpec
 from tca.storage.writer import PackageStore
 
 _EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
@@ -37,6 +37,8 @@ class Scrubber:
 
     def scrub(self, endpoint: str, payload: dict[str, Any]) -> dict[str, Any]:
         """Return a pseudonymised deep copy of ``payload``, or raise ScrubError."""
+        if endpoint.startswith("vds:"):
+            return self._scrub_vds(endpoint, payload)
         spec = MANIFEST.get(endpoint)
         if spec is None:
             raise ScrubError(
@@ -49,6 +51,39 @@ class Scrubber:
                 self._pseudonymise(user_obj, endpoint=endpoint, path=path)
         for path in spec.redact_paths:
             _redact(sanitized, path)
+        self._safety_net(endpoint, sanitized)
+        return sanitized
+
+    def _scrub_vds(self, endpoint: str, payload: dict[str, Any]) -> dict[str, Any]:
+        """Row-based scrub for VizQL Data Service results ({"data": [row, ...]})."""
+        spec: VdsSourceSpec | None = VDS_MANIFEST.get(endpoint)
+        if spec is None:
+            raise ScrubError(
+                f"VDS source '{endpoint}' is not registered in the PII manifest "
+                "(tca/pseudo/manifest.py). Refusing to write its payload."
+            )
+        sanitized = copy.deepcopy(payload)
+        rows = sanitized.get("data", [])
+        if spec.luid_column is not None:
+            for row in rows:
+                if not isinstance(row, dict):
+                    raise ScrubError(f"VDS row in '{endpoint}' is not an object.")
+                luid = row.get(spec.luid_column)
+                if not isinstance(luid, str) or not luid:
+                    raise ScrubError(
+                        f"VDS row in '{endpoint}' has no '{spec.luid_column}' — "
+                        "cannot pseudonymise, refusing to write."
+                    )
+                attrs = {
+                    attr: value
+                    for attr, column in spec.identity_attr_columns.items()
+                    if isinstance(value := row.get(column), str) and value
+                }
+                pseudonym = self._store.upsert_identity(self._run_id, user_luid=luid, **attrs)
+                row[spec.luid_column] = pseudonym
+                for column in spec.identity_attr_columns.values():
+                    if column in row:
+                        row[column] = pseudonym
         self._safety_net(endpoint, sanitized)
         return sanitized
 

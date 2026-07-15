@@ -15,6 +15,7 @@ from typing import Protocol
 
 from tca.pseudo.scrubber import Scrubber
 from tca.sources.rest import TableauRest
+from tca.sources.vds import VizqlDataService
 from tca.storage.writer import PackageStore
 
 
@@ -24,6 +25,7 @@ class RunContext:
     store: PackageStore
     scrubber: Scrubber
     run_id: int
+    vds: VizqlDataService | None = None
     # Called with (endpoint, page) after each landed page — the CLI uses it
     # for progress output; modules stay console-agnostic.
     on_page: Callable[[str, int], None] = lambda endpoint, page: None

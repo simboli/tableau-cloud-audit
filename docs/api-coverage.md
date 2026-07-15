@@ -80,9 +80,9 @@ in the pseudonymisation manifest (`pseudo/manifest.py`) before they can be calle
 
 | Datasource queried | Endpoint | Purpose | PII | Status |
 |---|---|---|---|---|
-| TS Events | `POST /api/v1/vizql-data-service/query-datasource` | Event log: sign-ins, views, publishes (90/365d window) | **yes** (actor) | 📋 planned |
-| TS Users | same | Last login beyond 90d, license role, activity aggregates | **yes** | 📋 planned |
-| Site Content | same | Last Accessed At — the zombie-detection backbone | **yes** (owner email) | 📋 planned |
+| TS Events | `POST /api/v1/vizql-data-service/query-datasource` | Event log: sign-ins, views, publishes (90/365d window) | minimized — identity columns (`Actor User Name`, `Item Owner Email`) never requested; numeric ids kept as join keys | ✅ implemented (`activity` module) |
+| TS Users | same | Last login beyond 90d, license role, activity aggregates | **yes** — `User LUID`/`User Name`/`User Email`/`User Friendly Name` → U-#### via vault | ✅ implemented (`activity` module) |
+| Site Content | same | Last Accessed At — the zombie-detection backbone | minimized — `Owner Email`, `Item Parent Project Owner Email`, `Description` never requested | ✅ implemented (`activity` module) |
 | Groups | same | Cross-check vs REST | **yes** | 💤 backlog |
 | Permissions | same | Cross-validation of permission data | **yes** | 💤 backlog |
 | Subscriptions | same | — | **yes** | 💤 backlog |

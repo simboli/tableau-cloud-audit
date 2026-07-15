@@ -261,10 +261,17 @@ Lessons from the live test (already encoded in code/tests):
   on signin even with a valid PAT.
 - Tableau signout replies 204 No Content; the client treats empty bodies as `{}`.
 
-Done since: content inventory module (`content`), redacted export (`tca export`).
+Done since: content inventory module (`content`), redacted export (`tca export`),
+checkpoint/resume, permissions module, VDS/Admin Insights `activity` module
+(TS Events / TS Users / Site Content; third manifest primitive = query-time
+minimization via curated VDS field lists; numeric Tableau user ids stay in clear
+as join keys, mapped to people only through the pseudonymised TS Users; `verify`
+checks Admin Insights presence + VDS access). Default collect =
+rest_core,content,permissions,activity.
 
-Next milestones: checkpoint/resume (in progress), permissions module, VDS/Admin
-Insights activity module, typed state/history layer.
+Next milestones: remaining VDS sources (Tokens, Job Performance...), history-grade
+event accumulation (dedup on Event Id — beats the 90-day retention), typed
+state/history layer, clear views / `tca peek`, OSS polish (CI, SECURITY.md).
 
 Backlog (agreed with maintainer):
 - **Clear views / `tca peek`**: local-only readable views joining `raw` with

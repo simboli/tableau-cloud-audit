@@ -161,6 +161,10 @@ class RestClient:
             "GET", f"/api/{self.api_version}/sites/{self.site_luid}{path}", params=params
         )
 
+    def post_api(self, path: str, json: dict[str, Any]) -> dict[str, Any]:
+        """POST to a non-site-scoped API path (e.g. VizQL Data Service), authed."""
+        return self._request_json("POST", path, json=json)
+
     def paginate(
         self,
         path: str,

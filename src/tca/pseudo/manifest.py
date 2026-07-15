@@ -106,3 +106,102 @@ MANIFEST: dict[str, EndpointSpec] = {
         ]
     ),
 }
+
+
+# ============================================================================
+# VizQL Data Service (Admin Insights) — row-based sources
+# ============================================================================
+#
+# VDS lets us choose the columns at query time, so the primary privacy
+# mechanism here is MINIMIZATION: identity columns we don't need (e.g.
+# 'Actor User Name', 'Owner Email') are simply never requested — ``fields``
+# below is the complete, exhaustive list of what the collector asks for.
+#
+# Numeric user ids ('Actor User Id', 'User ID', 'Item Owner Id', ...) are
+# kept in the clear: they are Tableau-internal join keys that map to a person
+# only through TS Users — whose identity columns ARE pseudonymised via the
+# vault ('User LUID' + attributes -> U-####).
+
+
+@dataclass(frozen=True)
+class VdsSourceSpec:
+    """One Admin Insights datasource: what to request and what to pseudonymise."""
+
+    datasource_name: str  # display name inside the 'Admin Insights' project
+    fields: tuple[str, ...]  # ONLY these captions are ever requested
+    luid_column: str | None = None  # column holding the Tableau user LUID
+    # vault attribute -> column caption; each listed column is replaced by U-####
+    identity_attr_columns: dict[str, str] = field(default_factory=dict)
+
+
+VDS_MANIFEST: dict[str, VdsSourceSpec] = {
+    "vds:ts_events": VdsSourceSpec(
+        datasource_name="TS Events",
+        fields=(
+            "Event Id",
+            "Event Date",
+            "Event Name",
+            "Event Type",
+            "Item Id",
+            "Item LUID",
+            "Item Type",
+            "Item Name",
+            "Project Name",
+            "Actor User Id",  # numeric join key, not an identity
+            "Actor Site Role",
+            "Actor License Role",
+            "Item Owner Id",  # numeric join key
+            "Target User Id",  # numeric join key
+        ),
+    ),
+    "vds:ts_users": VdsSourceSpec(
+        datasource_name="TS Users",
+        fields=(
+            "User ID",  # numeric join key towards TS Events
+            "User LUID",
+            "User Name",
+            "User Email",
+            "User Friendly Name",
+            "User Site Role",
+            "User License Type",
+            "User Creation Date",
+            "Last Login Date",
+            "Days Since Last Login",
+        ),
+        luid_column="User LUID",
+        identity_attr_columns={
+            "name": "User Name",
+            "email": "User Email",
+            "full_name": "User Friendly Name",
+        },
+    ),
+    "vds:site_content": VdsSourceSpec(
+        datasource_name="Site Content",
+        # NOTE: 'Owner Email', 'Item Parent Project Owner Email' and the
+        # free-text 'Description' are deliberately NOT requested.
+        fields=(
+            "Item ID",
+            "Item LUID",
+            "Item Type",
+            "Item Name",
+            "Item Parent Project Name",
+            "Top Parent Project Name",
+            "Project Level",
+            "Created At",
+            "Updated At",
+            "First Published At",
+            "Last Published At",
+            "Last Accessed At",
+            "Size (bytes)",
+            "Is Data Extract",
+            "Has Refresh Scheduled",
+            "Data Source Is Certified",
+            "Data Source Database Type",
+            "View Workbook ID",
+            "View Type",
+            "Controlled Permissions Enabled",
+            "Controlling Permissions Project LUID",
+            "Tags",
+        ),
+    ),
+}
