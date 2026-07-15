@@ -22,17 +22,17 @@ in the pseudonymisation manifest (`pseudo/manifest.py`) before they can be calle
 
 | Endpoint | Method | Purpose | PII | Status |
 |---|---|---|---|---|
-| `/api/2.4/serverinfo` | GET | Resolve REST API version dynamically (unauthenticated) | — | 🔜 next |
-| `/api/{v}/auth/signin` | POST | PAT sign-in → session token + site LUID | — | 🔜 next |
-| `/api/{v}/auth/signout` | POST | Clean session termination at end of run | — | 🔜 next |
+| `/api/3.4/serverinfo` | GET | Resolve REST API version dynamically (unauthenticated) | — | ✅ implemented |
+| `/api/{v}/auth/signin` | POST | PAT sign-in → session token + site LUID; silent re-auth on 401 | — | ✅ implemented |
+| `/api/{v}/auth/signout` | POST | Clean session termination at end of run | — | ✅ implemented |
 
 ## REST — identity core (MVP milestone)
 
 | Endpoint | Method | Purpose | PII | Status |
 |---|---|---|---|---|
-| `/api/{v}/sites/{site}/users?fields=_all_` | GET (paginated) | All users: site role, last login, auth setting, … | **yes** (name, fullName, email, externalAuthUserId) | 🔜 next |
-| `/api/{v}/sites/{site}/groups` | GET (paginated) | All groups (names stay in the clear by design) | no | 🔜 next |
-| `/api/{v}/sites/{site}/groups/{group}/users` | GET (paginated, per group) | Group membership edges | **yes** (user objects) | 🔜 next |
+| `/api/{v}/sites/{site}/users?fields=_all_` | GET (paginated) | All users: site role, last login, auth setting, … | **yes** (name, fullName, email, externalAuthUserId) | 🚧 in progress (transport + manifest done; collect module pending) |
+| `/api/{v}/sites/{site}/groups` | GET (paginated) | All groups (names stay in the clear by design) | no | 🚧 in progress (transport + manifest done; collect module pending) |
+| `/api/{v}/sites/{site}/groups/{group}/users` | GET (paginated, per group) | Group membership edges | **yes** (user objects) | 🚧 in progress (transport + manifest done; collect module pending) |
 
 ## REST — content inventory
 
