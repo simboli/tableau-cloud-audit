@@ -474,6 +474,53 @@ def export(
         raise _fail(str(exc)) from exc
 
 
+# ---------------------------------------------------------------------- peek
+
+PEEK_VIEWS = {
+    "users": "clear.users",
+    "members": "clear.group_members",
+    "content": "clear.content_owners",
+    "rules": "clear.permission_rules",
+}
+
+
+@app.command()
+def peek(
+    view: str = typer.Argument(..., help=f"One of: {', '.join(PEEK_VIEWS)}."),
+    config: Path = CONFIG_OPTION,
+    limit: int = typer.Option(50, "--limit", "-n", help="Max rows to display."),
+) -> None:
+    """Browse the latest snapshot WITH real identities (local file only).
+
+    Computed at read time by joining state with the identity vault — nothing
+    clear is stored, and the export physically lacks the data to do this.
+    """
+    if view not in PEEK_VIEWS:
+        raise _fail(f"Unknown view '{view}'. Available: {', '.join(PEEK_VIEWS)}.")
+    try:
+        cfg = Config.load(config)
+        if not cfg.database_path.exists():
+            raise _fail(f"No package file at {cfg.database_path} — run `tca collect` first.")
+        with PackageStore(cfg.database_path, db_key()) as store:
+            cursor = store.con.execute(f"SELECT * FROM {PEEK_VIEWS[view]} LIMIT {int(limit)}")
+            columns = [d[0] for d in cursor.description]
+            rows = cursor.fetchall()
+        console.print(
+            "[yellow]⚠ REAL identities below — resolved locally from the identity "
+            "vault. This is exactly what `tca export` can NOT reproduce.[/yellow]"
+        )
+        table = Table(title=f"{PEEK_VIEWS[view]} (latest ok run, max {limit} rows)")
+        for column in columns:
+            table.add_column(column)
+        for row in rows:
+            table.add_row(*[str(v) if v is not None else "—" for v in row])
+        console.print(table)
+        if not rows:
+            console.print("[dim]No rows — has a collect completed successfully?[/dim]")
+    except _USER_ERRORS as exc:
+        raise _fail(str(exc)) from exc
+
+
 # ------------------------------------------------------------------- resolve
 
 

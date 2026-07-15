@@ -306,10 +306,16 @@ pages are not typed yet (state derives from REST endpoints only for now).
 Live sandbox note: `/users` hides Tableau system/service accounts — they
 surface only via group membership; the typed layer reflects endpoint truth.
 
-Next milestones: clear views / `tca peek`, OSS polish (CI, SECURITY.md,
-what-we-collect.md), remaining VDS backlog sources (Groups, Permissions,
-Subscriptions, Viz Load Times), typed state for VDS sources, history
-accumulation for job runs (dedup on Job LUID, like events).
+Done 2026-07-15 (night, later): **clear views + `tca peek`** — migration 004
+(v0.4): `clear` schema with 4 read-time views (users, group_members,
+content_owners, permission_rules with grantee resolved to email/group name)
+joining state with identity.map; `tca peek users|members|content|rules`
+prints them with a "REAL identities, local only" banner. Export copies tables
+only, so neither the views nor the vault ever travel — verified by test.
+
+Next milestones: OSS polish (CI, SECURITY.md, what-we-collect.md), remaining
+VDS backlog sources (Groups, Permissions, Subscriptions, Viz Load Times),
+typed state for VDS sources, history accumulation for job runs.
 
 Backlog (agreed with maintainer):
 - **Clear views / `tca peek`**: local-only readable views joining `raw` with

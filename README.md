@@ -46,10 +46,12 @@ unset, the collector warns and writes an unencrypted file.
 
 ```
 tca init          # wizard → collector.toml + empty package file
-tca collect       # run the collection
-tca verify        # check PAT, site reachability, prerequisites
-tca summary       # what's in the file: runs, row counts, coverage
+tca collect       # run the collection (resumable: --resume after interruption)
+tca verify        # check PAT, site, VDS access, prerequisites
+tca summary       # what's in the file: runs, row counts, event history, gaps
+tca peek users    # browse the latest snapshot WITH real names (local only)
 tca resolve U-42  # pseudonym → identity (reads the local identity table)
+tca export        # the shareable copy: everything EXCEPT the identity vault
 ```
 
 Secrets are environment variables only, never files:
