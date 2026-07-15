@@ -269,9 +269,19 @@ as join keys, mapped to people only through the pseudonymised TS Users; `verify`
 checks Admin Insights presence + VDS access). Default collect =
 rest_core,content,permissions,activity.
 
-Next milestones: remaining VDS sources (Tokens, Job Performance...), history-grade
-event accumulation (dedup on Event Id — beats the 90-day retention), typed
-state/history layer, clear views / `tca peek`, OSS polish (CI, SECURITY.md).
+Done 2026-07-15 (later): **event history accumulation** — `history.events`
+(dedup on `Event Id` via INSERT OR IGNORE, `first_seen_run` provenance; schema
+v0.2, additive) + `meta.event_coverage` with conservative min/max windows and
+the `meta.v_event_gaps` view; the activity module folds landed TS Events pages
+into history reading them back FROM raw (resume-safe: a crash between landing
+and accumulation heals on re-run); `tca summary` shows the history window and
+warns on gaps. Note: files created before v0.2 keep `schema_version=0.1` in
+file_info but receive the new tables via IF NOT EXISTS — a real migration
+story is still pending.
+
+Next milestones: remaining VDS sources (Tokens, Job Performance...), typed
+state layer, clear views / `tca peek`, OSS polish (CI, SECURITY.md),
+schema-version migration bookkeeping.
 
 Backlog (agreed with maintainer):
 - **Clear views / `tca peek`**: local-only readable views joining `raw` with

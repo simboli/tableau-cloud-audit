@@ -391,7 +391,18 @@ def summary(config: Path = CONFIG_OPTION) -> None:
             table.add_row("collection runs", str(info["runs"]))
             table.add_row("response pages", str(info["response_pages"]))
             table.add_row("users in identity vault", str(info["known_users"]))
+            table.add_row("events in history", str(info["events"]))
+            if info["events"]:
+                table.add_row(
+                    "event history window", f"{info['events_from']} → {info['events_to']}"
+                )
+                table.add_row("coverage gaps", str(info["coverage_gaps"]))
             console.print(table)
+            if info["coverage_gaps"]:
+                console.print(
+                    "[yellow]⚠ The event history has gaps (runs were further apart "
+                    "than the retention window). Details: meta.v_event_gaps[/yellow]"
+                )
             if info["last_run"] is not None:
                 run = info["last_run"]
                 console.print(

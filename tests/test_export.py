@@ -27,7 +27,9 @@ def test_export_copies_everything_but_identity(tmp_path: Path) -> None:
 
     assert counts == {
         "meta.collection_runs": 1,
+        "meta.event_coverage": 0,
         "meta.file_info": 1,
+        "history.events": 0,
         "raw.api_responses": 1,
     }
 

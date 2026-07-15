@@ -21,6 +21,7 @@ from tca.sources.rest import DATASOURCES
 from tca.transport.client import TransportError
 
 ADMIN_INSIGHTS_PROJECT = "Admin Insights"
+TS_EVENTS_ENDPOINT = "vds:ts_events"
 
 
 class ActivityModule:
@@ -48,21 +49,40 @@ class ActivityModule:
                 continue
             if ctx.is_done(endpoint, luid):
                 stats.count(endpoint, written=False)
-                continue
-            try:
-                available = ctx.vds.field_captions(luid)
-                requested = [c for c in spec.fields if c in available]
-                payload = ctx.vds.query(luid, requested)
-            except TransportError as exc:
-                if exc.status_code in (403, 404):
-                    # VDS access not granted on this datasource — the #1
-                    # documented setup failure mode; skip and record
-                    stats.count_denied(endpoint, luid)
-                    continue
-                raise
-            stats.count(endpoint, ctx.land(endpoint, payload, entity_luid=luid))
+            else:
+                try:
+                    available = ctx.vds.field_captions(luid)
+                    requested = [c for c in spec.fields if c in available]
+                    payload = ctx.vds.query(luid, requested)
+                except TransportError as exc:
+                    if exc.status_code in (403, 404):
+                        # VDS access not granted on this datasource — the #1
+                        # documented setup failure mode; skip and record
+                        stats.count_denied(endpoint, luid)
+                        continue
+                    raise
+                stats.count(endpoint, ctx.land(endpoint, payload, entity_luid=luid))
+
+            if endpoint == TS_EVENTS_ENDPOINT:
+                self._accumulate_history(ctx, endpoint, luid)
 
         return stats
+
+    def _accumulate_history(self, ctx: RunContext, endpoint: str, luid: str) -> None:
+        """Fold the landed TS Events page into history.events (dedup on Event Id).
+
+        Reads back the SANITIZED payload from raw — history always derives from
+        what was actually stored, and this also makes resume safe: a crash
+        between landing and accumulation is healed by re-running.
+        """
+        payload = ctx.store.get_response(ctx.run_id, endpoint, entity_luid=luid)
+        if payload is None:  # page denied/never landed in this run
+            return
+        rows = payload.get("data", [])
+        ctx.store.insert_events(ctx.run_id, rows)
+        dates = [d for row in rows if (d := row.get("Event Date")) is not None]
+        if dates:
+            ctx.store.record_coverage(ctx.run_id, endpoint, min(dates), max(dates))
 
 
 def _admin_insights_luids(payload: dict[str, Any]) -> dict[str, str]:

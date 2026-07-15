@@ -96,7 +96,16 @@ def test_activity_lands_scrubbed_vds_rows(httpx_mock: HTTPXMock, connected) -> N
                 "fields": [{"fieldCaption": c} for c in VDS_MANIFEST["vds:ts_events"].fields]
             },
         },
-        json={"data": [{"Event Id": 1, "Event Name": "access-view", "Actor User Id": 42}]},
+        json={
+            "data": [
+                {
+                    "Event Id": 1,
+                    "Event Date": "2026-07-01T10:00:00",
+                    "Event Name": "access-view",
+                    "Actor User Id": 42,
+                }
+            ]
+        },
     )
     httpx_mock.add_response(
         url=f"{VDS}/query-datasource",
@@ -138,6 +147,16 @@ def test_activity_lands_scrubbed_vds_rows(httpx_mock: HTTPXMock, connected) -> N
         "vds:ts_users": 1,
         "vds:site_content": 1,
     }
+
+    # the event flowed into the deduplicated history with its provenance
+    hist = store.con.execute(
+        "SELECT event_id, event_name, actor_user_id, first_seen_run FROM history.events"
+    ).fetchall()
+    assert hist == [(1, "access-view", 42, ctx.run_id)]
+    coverage = store.con.execute(
+        "SELECT source FROM meta.event_coverage WHERE run_id = ?", [ctx.run_id]
+    ).fetchall()
+    assert coverage == [("vds:ts_events",)]
 
     # TS Users row fully pseudonymised, vault enriched, numeric id kept as join key
     row = json.loads(

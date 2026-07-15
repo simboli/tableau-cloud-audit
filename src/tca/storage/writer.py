@@ -24,8 +24,27 @@ import duckdb
 
 from tca import __version__
 
-SCHEMA_VERSION = "0.1"
+SCHEMA_VERSION = "0.2"
 _CATALOG = "pkg"
+
+# TS Events caption -> history.events column. Captions MUST stay in sync with
+# the curated field list in the VDS manifest (tca/pseudo/manifest.py).
+TS_EVENTS_COLUMNS: tuple[tuple[str, str], ...] = (
+    ("Event Id", "event_id"),
+    ("Event Date", "event_date"),
+    ("Event Name", "event_name"),
+    ("Event Type", "event_type"),
+    ("Item Id", "item_id"),
+    ("Item LUID", "item_luid"),
+    ("Item Type", "item_type"),
+    ("Item Name", "item_name"),
+    ("Project Name", "project_name"),
+    ("Actor User Id", "actor_user_id"),
+    ("Actor Site Role", "actor_site_role"),
+    ("Actor License Role", "actor_license_role"),
+    ("Item Owner Id", "item_owner_id"),
+    ("Target User Id", "target_user_id"),
+)
 
 
 class StorageError(RuntimeError):
@@ -221,6 +240,59 @@ class PackageStore:
             [run_id, endpoint, entity_luid, page, _now(), json.dumps(payload)],
         )
 
+    def get_response(
+        self, run_id: int, endpoint: str, entity_luid: str | None = None, page: int = 1
+    ) -> dict[str, Any] | None:
+        """Read back a landed (already sanitized) page — used on resume so the
+        history layer can be rebuilt from raw without refetching."""
+        row = self.con.execute(
+            "SELECT payload FROM raw.api_responses "
+            "WHERE run_id = ? AND endpoint = ? AND page = ? "
+            "AND coalesce(entity_luid, '') = coalesce(?, '')",
+            [run_id, endpoint, page, entity_luid],
+        ).fetchone()
+        return json.loads(row[0]) if row is not None else None
+
+    # -- event history --------------------------------------------------------
+
+    def insert_events(self, run_id: int, rows: list[dict[str, Any]]) -> int:
+        """Dedup-append TS Events rows (INSERT OR IGNORE on event_id).
+
+        Returns the number of NEW events; re-inserting known ones is a no-op,
+        so this is safe to call on every run and on resume.
+        """
+        params: list[list[Any]] = []
+        for row in rows:
+            if row.get("Event Id") is None:
+                raise StorageError(
+                    "A TS Events row has no 'Event Id' — cannot deduplicate. "
+                    "Field captions may have drifted; check the VDS manifest."
+                )
+            params.append([row.get(caption) for caption, _ in TS_EVENTS_COLUMNS] + [run_id])
+        if not params:
+            return 0
+        before = self._event_count()
+        columns = ", ".join(column for _, column in TS_EVENTS_COLUMNS) + ", first_seen_run"
+        placeholders = ", ".join("?" for _ in range(len(TS_EVENTS_COLUMNS) + 1))
+        self.con.executemany(
+            f"INSERT OR IGNORE INTO history.events ({columns}) VALUES ({placeholders})", params
+        )
+        return self._event_count() - before
+
+    def _event_count(self) -> int:
+        row = self.con.execute("SELECT count(*) FROM history.events").fetchone()
+        assert row is not None
+        return int(row[0])
+
+    def record_coverage(self, run_id: int, source: str, start: Any, end: Any) -> None:
+        """Idempotent per (run_id, source): resume replaces instead of duplicating."""
+        self.con.execute(
+            "DELETE FROM meta.event_coverage WHERE run_id = ? AND source = ?", [run_id, source]
+        )
+        self.con.execute(
+            "INSERT INTO meta.event_coverage VALUES (?, ?, ?, ?)", [run_id, source, start, end]
+        )
+
     # -- identity vault -----------------------------------------------------------
 
     def upsert_identity(
@@ -346,7 +418,11 @@ class PackageStore:
             SELECT
               (SELECT count(*) FROM meta.collection_runs) AS runs,
               (SELECT count(*) FROM raw.api_responses)    AS response_pages,
-              (SELECT count(*) FROM identity.map)         AS known_users
+              (SELECT count(*) FROM identity.map)         AS known_users,
+              (SELECT count(*) FROM history.events)       AS events,
+              (SELECT min(event_date) FROM history.events) AS events_from,
+              (SELECT max(event_date) FROM history.events) AS events_to,
+              (SELECT count(*) FROM meta.v_event_gaps)    AS coverage_gaps
             """
         ).fetchone()
         assert counts is not None
@@ -359,5 +435,9 @@ class PackageStore:
             "runs": counts[0],
             "response_pages": counts[1],
             "known_users": counts[2],
+            "events": counts[3],
+            "events_from": counts[4],
+            "events_to": counts[5],
+            "coverage_gaps": counts[6],
             "last_run": last,
         }
