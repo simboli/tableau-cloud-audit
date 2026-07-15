@@ -141,3 +141,23 @@ def test_summary_without_file(workdir: Path) -> None:
     result = runner.invoke(app, ["summary"])
     assert result.exit_code == 1
     assert "tca collect" in result.output
+
+
+def test_export_after_collect(workdir: Path, httpx_mock: HTTPXMock) -> None:
+    write_config(workdir)
+    mock_signin(httpx_mock)
+    mock_collect_endpoints(httpx_mock)
+    runner.invoke(app, ["collect", "--modules", "rest_core"])
+
+    result = runner.invoke(app, ["export"])
+    assert result.exit_code == 0, result.output
+    assert (workdir / "acme-export.duckdb").exists()
+    assert (workdir / "acme-export.duckdb.sha256").exists()
+    assert "identity vault NOT exported" in result.output
+
+    # second run refuses, --force overwrites
+    result = runner.invoke(app, ["export"])
+    assert result.exit_code == 1
+    assert "--force" in result.output
+    result = runner.invoke(app, ["export", "--force"])
+    assert result.exit_code == 0, result.output

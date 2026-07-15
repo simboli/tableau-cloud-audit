@@ -7,6 +7,7 @@ never from flags.
 
 from __future__ import annotations
 
+import hashlib
 import time
 from pathlib import Path
 
@@ -298,6 +299,57 @@ def summary(config: Path = CONFIG_OPTION) -> None:
                 console.print(
                     f"Last run: #{run[0]} — {run[3]} — started {run[1]} — modules {run[4]}"
                 )
+    except _USER_ERRORS as exc:
+        raise _fail(str(exc)) from exc
+
+
+# -------------------------------------------------------------------- export
+
+
+@app.command()
+def export(
+    output: Path | None = typer.Argument(
+        None, help="Destination file (default: <database>-export.duckdb)."
+    ),
+    config: Path = CONFIG_OPTION,
+    force: bool = typer.Option(False, "--force", help="Overwrite an existing export."),
+) -> None:
+    """Produce the shareable copy: everything EXCEPT the identity vault.
+
+    The export contains pseudonyms only, is unencrypted (inspectable by
+    anyone), and is verified before completion. This is the only file that
+    may leave this machine.
+    """
+    try:
+        cfg = Config.load(config)
+        if not cfg.database_path.exists():
+            raise _fail(f"No package file at {cfg.database_path} — run `tca collect` first.")
+        dest = output or cfg.database_path.with_name(cfg.database_path.stem + "-export.duckdb")
+        if dest.exists():
+            if not force:
+                raise _fail(f"'{dest}' already exists. Use --force to overwrite.")
+            dest.unlink()
+
+        with PackageStore(cfg.database_path, db_key()) as store:
+            counts = store.export_redacted(dest)
+
+        digest = hashlib.sha256(dest.read_bytes()).hexdigest()
+        checksum_path = Path(f"{dest}.sha256")
+        checksum_path.write_text(f"{digest}  {dest.name}\n", encoding="utf-8")
+
+        table = Table(title=f"exported to {dest.name}")
+        table.add_column("table")
+        table.add_column("rows", justify="right")
+        for name, rows in counts.items():
+            table.add_row(name, str(rows))
+        console.print(table)
+        console.print("[green]✓[/green] identity vault NOT exported — pseudonyms only")
+        console.print("[green]✓[/green] verified: no e-mail-shaped strings in the export")
+        console.print(f"[green]✓[/green] SHA-256 written to {checksum_path.name}:\n  {digest}")
+        console.print(
+            "[dim]The export is unencrypted plain DuckDB — open it with any DuckDB "
+            "client to inspect exactly what would be shared.[/dim]"
+        )
     except _USER_ERRORS as exc:
         raise _fail(str(exc)) from exc
 

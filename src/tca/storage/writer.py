@@ -240,6 +240,65 @@ class PackageStore:
         rows = self.con.execute("SELECT user_luid FROM identity.map").fetchall()
         return {r[0] for r in rows}
 
+    # -- redacted export -----------------------------------------------------------
+
+    def export_redacted(self, dest: Path) -> dict[str, int]:
+        """Copy every schema EXCEPT ``identity`` into a new, unencrypted file.
+
+        This is the only artifact allowed to leave the client machine: it holds
+        pseudonyms only, is plain DuckDB (inspectable by anyone), and is
+        verified before returning — an e-mail-shaped string anywhere in the
+        exported raw payloads aborts the export and deletes the file.
+        """
+        if dest.exists():
+            raise StorageError(f"'{dest}' already exists — refusing to overwrite.")
+        self.con.execute(f"ATTACH '{dest.as_posix()}' AS exp")
+        try:
+            tables = self.con.execute(
+                f"""
+                SELECT schema_name, table_name FROM duckdb_tables()
+                WHERE database_name = '{_CATALOG}' AND schema_name <> 'identity'
+                ORDER BY schema_name, table_name
+                """
+            ).fetchall()
+            counts: dict[str, int] = {}
+            for schema, table in tables:
+                self.con.execute(f'CREATE SCHEMA IF NOT EXISTS exp."{schema}"')
+                self.con.execute(
+                    f'CREATE TABLE exp."{schema}"."{table}" AS '
+                    f'SELECT * FROM {_CATALOG}."{schema}"."{table}"'
+                )
+                row = self.con.execute(f'SELECT count(*) FROM exp."{schema}"."{table}"').fetchone()
+                assert row is not None
+                counts[f"{schema}.{table}"] = int(row[0])
+
+            # the copy describes itself: it is not encrypted
+            self.con.execute("UPDATE exp.meta.file_info SET is_encrypted = false")
+
+            # verification: no identity schema, no e-mail-shaped strings
+            leftover = self.con.execute(
+                "SELECT count(*) FROM duckdb_tables() "
+                "WHERE database_name = 'exp' AND schema_name = 'identity'"
+            ).fetchone()
+            assert leftover is not None and int(leftover[0]) == 0
+            emails = self.con.execute(
+                r"SELECT count(*) FROM exp.raw.api_responses "
+                r"WHERE regexp_matches(payload::VARCHAR, "
+                r"'[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}')"
+            ).fetchone()
+            assert emails is not None
+            if int(emails[0]) > 0:
+                raise StorageError(
+                    f"Export verification failed: {emails[0]} page(s) contain an "
+                    "e-mail-shaped string. The export was NOT produced."
+                )
+        except BaseException:
+            self.con.execute("DETACH exp")
+            dest.unlink(missing_ok=True)
+            raise
+        self.con.execute("DETACH exp")
+        return counts
+
     # -- summary -----------------------------------------------------------------
 
     def summary(self) -> dict[str, Any]:

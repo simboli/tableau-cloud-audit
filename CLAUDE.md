@@ -66,14 +66,10 @@ and the community's only window into how carefully the whole thing is built.
      names/emails/LUIDs may appear, keyed by a stable pseudonym (`U-####`).
    - Everywhere else in the file, only `user_pseudo` appears — never the raw user LUID,
      name, or email.
-   - **Known architectural debt, intentional and accepted:** because identity now lives
-     *inside* the shippable package file rather than in a separate file that never
-     leaves the client, this file is **not yet safe to hand to an analyst as-is**. A
-     future "export for analyst" step (parquet export or a redacted DB copy that drops
-     the `identity` schema) is required before this file may ever cross the client→
-     analyst trust boundary. **Do not forget this when the export/delivery feature is
-     eventually built** — until it exists, this package file must never leave the
-     client machine.
+   - ~~Known architectural debt~~ **CLOSED 2026-07-15 by `tca export`**: the redacted
+     copy (every schema except `identity`, unencrypted, e-mail-regex verified, SHA-256
+     sidecar) is the ONLY artifact allowed to cross the client→analyst boundary. The
+     original package file still never leaves the client machine.
    - **Mechanism — write-time scrubbing, not export-time filtering.** We considered
      "land everything raw, filter PII only on export" and rejected it: the package file
      is explicitly long-lived (reused run after run, accumulating history across
