@@ -313,9 +313,19 @@ joining state with identity.map; `tca peek users|members|content|rules`
 prints them with a "REAL identities, local only" banner. Export copies tables
 only, so neither the views nor the vault ever travel — verified by test.
 
-Next milestones: OSS polish (CI, SECURITY.md, what-we-collect.md), remaining
-VDS backlog sources (Groups, Permissions, Subscriptions, Viz Load Times),
-typed state for VDS sources, history accumulation for job runs.
+Done 2026-07-15 (final): **schema contract test**
+(`tests/test_schema_contract.py`) — the analyst-side compatibility guarantee,
+requested explicitly by the maintainer (his analysis engine depends on stable
+tables). Golden snapshot of every table/column/type + every view, spelled out
+literally in the test (reviewers must see contract changes in the diff).
+Removals/renames/type changes fail; additions welcome but must be added to
+the contract (enforced by a third test). When schema grows: update
+GOLDEN_TABLES/GOLDEN_VIEWS in the same PR as the migration.
+
+Next milestones: OSS polish (CI GitHub Actions running the suite — the
+contract test becomes the merge gate —, SECURITY.md, what-we-collect.md),
+remaining VDS backlog sources, typed state for VDS sources, history
+accumulation for job runs.
 
 Backlog (agreed with maintainer):
 - **Clear views / `tca peek`**: local-only readable views joining `raw` with
