@@ -27,6 +27,7 @@ from tca.config import (
 )
 from tca.modules import base as modules_base
 from tca.modules.content import ContentModule  # noqa: F401  (registers itself)
+from tca.modules.permissions import PermissionsModule  # noqa: F401  (registers itself)
 from tca.modules.rest_core import RestCoreModule  # noqa: F401  (registers itself)
 from tca.pseudo.scrubber import Scrubber, ScrubError
 from tca.sources.rest import TableauRest
@@ -186,7 +187,10 @@ def verify(config: Path = CONFIG_OPTION) -> None:
 def collect(
     config: Path = CONFIG_OPTION,
     modules: str = typer.Option(
-        "rest_core,content", "--modules", "-m", help="Comma-separated module names."
+        "rest_core,content,permissions",
+        "--modules",
+        "-m",
+        help="Comma-separated module names.",
     ),
     resume: bool = typer.Option(
         False, "--resume", help="Continue the last interrupted run instead of starting a new one."
@@ -253,12 +257,14 @@ def collect(
                 )
                 all_stats: dict[str, int] = {}
                 skipped = 0
+                denied: list[tuple[str, str]] = []
                 try:
                     for module in selected:
                         console.print(f"[bold]→ module {module.name}[/bold]")
                         stats = module.run(ctx)
                         all_stats.update(stats.pages)
                         skipped += stats.skipped
+                        denied.extend(stats.denied)
                 except KeyboardInterrupt:
                     store.finish_run(run_id, "partial", notes="interrupted by user")
                     console.print(
@@ -273,9 +279,18 @@ def collect(
                         "tca collect --resume[/yellow]"
                     )
                     raise
-                store.finish_run(run_id, "ok")
+                notes = None
+                if denied:
+                    notes = f"{len(denied)} item(s) denied (403/404), e.g. Personal Space content"
+                store.finish_run(run_id, "ok", notes=notes)
                 if skipped:
                     console.print(f"[dim]{skipped} already-collected pages skipped (resume)[/dim]")
+                if denied:
+                    console.print(
+                        f"[yellow]⚠ {len(denied)} item(s) refused a permissions query "
+                        "(403/404) and were skipped — typical for Personal Space "
+                        "content; recorded in the run notes.[/yellow]"
+                    )
                 _print_run_report(store, run_id, all_stats, time.monotonic() - started)
         finally:
             client.signout()

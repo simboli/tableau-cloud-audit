@@ -22,6 +22,11 @@ VIEWS = "/views"
 DATASOURCES = "/datasources"
 WORKBOOK_CONNECTIONS = "/workbooks/{luid}/connections"
 DATASOURCE_CONNECTIONS = "/datasources/{luid}/connections"
+PROJECT_PERMISSIONS = "/projects/{luid}/permissions"
+PROJECT_DEFAULT_PERMISSIONS_WORKBOOKS = "/projects/{luid}/default-permissions/workbooks"
+PROJECT_DEFAULT_PERMISSIONS_DATASOURCES = "/projects/{luid}/default-permissions/datasources"
+WORKBOOK_PERMISSIONS = "/workbooks/{luid}/permissions"
+DATASOURCE_PERMISSIONS = "/datasources/{luid}/permissions"
 
 Page = tuple[int, dict[str, Any]]
 
@@ -64,3 +69,24 @@ class TableauRest:
 
     def datasource_connections(self, datasource_luid: str) -> dict[str, Any]:
         return self._client.get_site(DATASOURCE_CONNECTIONS.replace("{luid}", datasource_luid))
+
+    # -- permissions (all single, unpaginated responses) --------------------------
+
+    def project_permissions(self, project_luid: str) -> dict[str, Any]:
+        return self._client.get_site(PROJECT_PERMISSIONS.replace("{luid}", project_luid))
+
+    def project_default_permissions_workbooks(self, project_luid: str) -> dict[str, Any]:
+        return self._client.get_site(
+            PROJECT_DEFAULT_PERMISSIONS_WORKBOOKS.replace("{luid}", project_luid)
+        )
+
+    def project_default_permissions_datasources(self, project_luid: str) -> dict[str, Any]:
+        return self._client.get_site(
+            PROJECT_DEFAULT_PERMISSIONS_DATASOURCES.replace("{luid}", project_luid)
+        )
+
+    def workbook_permissions(self, workbook_luid: str) -> dict[str, Any]:
+        return self._client.get_site(WORKBOOK_PERMISSIONS.replace("{luid}", workbook_luid))
+
+    def datasource_permissions(self, datasource_luid: str) -> dict[str, Any]:
+        return self._client.get_site(DATASOURCE_PERMISSIONS.replace("{luid}", datasource_luid))

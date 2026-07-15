@@ -72,4 +72,37 @@ MANIFEST: dict[str, EndpointSpec] = {
     "/datasources/{luid}/connections": EndpointSpec(
         redact_paths=["connections.connection[*].userName"]
     ),
+    # -- permissions -----------------------------------------------------------
+    # Users appear as grantees (granteeCapabilities[*].user) and as the owner
+    # of the target item; GROUP grantees stay in the clear by design.
+    "/projects/{luid}/permissions": EndpointSpec(
+        user_paths=[
+            "permissions.granteeCapabilities[*].user",
+            "permissions.project.owner",
+        ]
+    ),
+    "/projects/{luid}/default-permissions/workbooks": EndpointSpec(
+        user_paths=[
+            "permissions.granteeCapabilities[*].user",
+            "permissions.project.owner",
+        ]
+    ),
+    "/projects/{luid}/default-permissions/datasources": EndpointSpec(
+        user_paths=[
+            "permissions.granteeCapabilities[*].user",
+            "permissions.project.owner",
+        ]
+    ),
+    "/workbooks/{luid}/permissions": EndpointSpec(
+        user_paths=[
+            "permissions.granteeCapabilities[*].user",
+            "permissions.workbook.owner",
+        ]
+    ),
+    "/datasources/{luid}/permissions": EndpointSpec(
+        user_paths=[
+            "permissions.granteeCapabilities[*].user",
+            "permissions.datasource.owner",
+        ]
+    ),
 }

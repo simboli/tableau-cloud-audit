@@ -56,12 +56,16 @@ class RunContext:
 class ModuleStats:
     pages: dict[str, int] = field(default_factory=dict)
     skipped: int = 0  # units already landed before this run attempt (resume)
+    denied: list[tuple[str, str]] = field(default_factory=list)  # (endpoint, entity_luid)
 
     def count(self, endpoint: str, written: bool) -> None:
         if written:
             self.pages[endpoint] = self.pages.get(endpoint, 0) + 1
         else:
             self.skipped += 1
+
+    def count_denied(self, endpoint: str, entity_luid: str) -> None:
+        self.denied.append((endpoint, entity_luid))
 
 
 class Module(Protocol):

@@ -31,6 +31,10 @@ PAGE_SIZE = 1000  # Tableau REST maximum
 class TransportError(RuntimeError):
     """An API problem the user can act on (clear message, no secrets)."""
 
+    def __init__(self, message: str, status_code: int | None = None) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+
 
 class RestClient:
     """One authenticated session against one Tableau Cloud site."""
@@ -115,7 +119,8 @@ class RestClient:
                 attempt += 1
                 if attempt >= MAX_ATTEMPTS:
                     raise TransportError(
-                        f"Giving up after {MAX_ATTEMPTS} attempts: {_describe(response)}"
+                        f"Giving up after {MAX_ATTEMPTS} attempts: {_describe(response)}",
+                        status_code=response.status_code,
                     )
                 self._sleep(_backoff_seconds(response, attempt))
                 continue
@@ -134,7 +139,7 @@ class RestClient:
                         "environment variable, and the site name. PATs also expire "
                         "if unused for 15 days."
                     )
-                raise TransportError(message)
+                raise TransportError(message, status_code=response.status_code)
 
             if response.status_code == 204 or not response.content:
                 return {}  # e.g. signout replies 204 No Content
