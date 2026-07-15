@@ -275,13 +275,17 @@ v0.2, additive) + `meta.event_coverage` with conservative min/max windows and
 the `meta.v_event_gaps` view; the activity module folds landed TS Events pages
 into history reading them back FROM raw (resume-safe: a crash between landing
 and accumulation heals on re-run); `tca summary` shows the history window and
-warns on gaps. Note: files created before v0.2 keep `schema_version=0.1` in
-file_info but receive the new tables via IF NOT EXISTS — a real migration
-story is still pending.
+warns on gaps. Done 2026-07-15 (later still): **schema migrations** — `storage/schema.sql`
+replaced by numbered, additive-only files in `storage/migrations/`
+(001_init = v0.1, 002_event_history = v0.2; released files must NEVER be
+edited — new needs get a new number). `meta.schema_migrations` registry
+records version/filename/when/collector; opening a file auto-applies pending
+migrations (all idempotent, so pre-registry legacy files heal forward, incl.
+the stale file_info label) and **refuses files written by a newer collector**.
+There is no `tca migrate` command by design: every open migrates.
 
 Next milestones: remaining VDS sources (Tokens, Job Performance...), typed
-state layer, clear views / `tca peek`, OSS polish (CI, SECURITY.md),
-schema-version migration bookkeeping.
+state layer, clear views / `tca peek`, OSS polish (CI, SECURITY.md).
 
 Backlog (agreed with maintainer):
 - **Clear views / `tca peek`**: local-only readable views joining `raw` with

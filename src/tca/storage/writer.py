@@ -24,7 +24,13 @@ import duckdb
 
 from tca import __version__
 
-SCHEMA_VERSION = "0.2"
+# Ordered, additive-only migrations. NEVER edit a released file: a new need
+# means a new numbered entry. The last label is the current schema version.
+MIGRATIONS: tuple[tuple[str, str], ...] = (
+    ("0.1", "001_init.sql"),
+    ("0.2", "002_event_history.sql"),
+)
+SCHEMA_VERSION = MIGRATIONS[-1][0]
 _CATALOG = "pkg"
 
 # TS Events caption -> history.events column. Captions MUST stay in sync with
@@ -131,8 +137,45 @@ class PackageStore:
         return self._con
 
     def _ensure_schema(self) -> None:
-        sql = resources.files("tca.storage").joinpath("schema.sql").read_text(encoding="utf-8")
-        self.con.execute(sql)
+        """Bring the file up to the current schema by applying pending migrations.
+
+        The registry (meta.schema_migrations) records what was applied, when,
+        and by which collector version. Files touched by a NEWER collector are
+        refused instead of silently mangled. Files created before the registry
+        existed are healed forward: every migration is idempotent
+        (IF NOT EXISTS), so replaying them on an already-shaped file is safe.
+        """
+        self.con.execute("CREATE SCHEMA IF NOT EXISTS meta")
+        self.con.execute(
+            "CREATE TABLE IF NOT EXISTS meta.schema_migrations ("
+            "  version VARCHAR PRIMARY KEY,"
+            "  filename VARCHAR NOT NULL,"
+            "  applied_at TIMESTAMP NOT NULL,"
+            "  collector_version VARCHAR NOT NULL)"
+        )
+        applied = {
+            r[0] for r in self.con.execute("SELECT version FROM meta.schema_migrations").fetchall()
+        }
+        known = {version for version, _ in MIGRATIONS}
+        from_future = sorted(applied - known)
+        if from_future:
+            raise StorageError(
+                f"'{self.path}' uses schema version {from_future[-1]}, written by a "
+                f"newer collector than this one (which knows up to {SCHEMA_VERSION}). "
+                "Update tableau-cloud-audit and retry."
+            )
+        migrations_dir = resources.files("tca.storage").joinpath("migrations")
+        for version, filename in MIGRATIONS:
+            if version in applied:
+                continue
+            sql = migrations_dir.joinpath(filename).read_text(encoding="utf-8")
+            self.con.execute(sql)
+            self.con.execute(
+                "INSERT INTO meta.schema_migrations VALUES (?, ?, ?, ?)",
+                [version, filename, _now(), __version__],
+            )
+        # keep the single-row label in sync (no-op while file_info is empty)
+        self.con.execute("UPDATE meta.file_info SET schema_version = ?", [SCHEMA_VERSION])
 
     # -- transactions ----------------------------------------------------------
 
