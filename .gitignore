@@ -14,6 +14,7 @@ build/
 # Site-specific local files — never commit client data or config
 *.duckdb
 *.duckdb.wal
+*.duckdb.sha256
 collector.toml
 .env
 
