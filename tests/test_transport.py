@@ -163,8 +163,12 @@ def test_credentials_repr_hides_secret() -> None:
     assert "hidden-value" not in repr(creds)
 
 
-def test_full_base_url_accepted() -> None:
-    creds = Credentials.build(
-        pod="https://tableau.example.com/", site="s", pat_name="n", pat_secret="x"
-    )
-    assert creds.server == "https://tableau.example.com"
+def test_bare_pod_name_builds_server() -> None:
+    creds = Credentials.build(pod="10ax", site="s", pat_name="n", pat_secret="x")
+    assert creds.server == "https://10ax.online.tableau.com"
+
+
+def test_hostname_or_url_as_pod_is_rejected() -> None:
+    for pod in ("10ax.online.tableau.com", "https://10ax.online.tableau.com"):
+        with pytest.raises(ValueError, match="bare pod name"):
+            Credentials.build(pod=pod, site="s", pat_name="n", pat_secret="x")

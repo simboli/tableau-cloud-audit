@@ -24,9 +24,15 @@ class Credentials:
 
     @classmethod
     def build(cls, pod: str, site: str, pat_name: str, pat_secret: str) -> Credentials:
-        """Accept either a pod name ('eu-west-1a') or a full base URL."""
-        server = pod if "://" in pod else f"https://{pod}.online.tableau.com"
-        return cls(server=server.rstrip("/"), site=site, pat_name=pat_name, pat_secret=pat_secret)
+        """The pod is the bare pod name only ('10ax', 'eu-west-1a'):
+        the first label of your Tableau Cloud hostname."""
+        if "/" in pod or "." in pod:
+            raise ValueError(
+                f"pod must be the bare pod name (e.g. '10ax' for "
+                f"10ax.online.tableau.com), got '{pod}'."
+            )
+        server = f"https://{pod}.online.tableau.com"
+        return cls(server=server, site=site, pat_name=pat_name, pat_secret=pat_secret)
 
 
 def signin_body(creds: Credentials) -> dict[str, Any]:

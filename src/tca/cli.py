@@ -93,7 +93,7 @@ def init(
 
     console.print(Panel.fit("[bold]tableau-cloud-audit — setup[/bold]"))
     site = typer.prompt("Site name (the part after /site/ in your Tableau Cloud URL)")
-    pod = typer.prompt("Pod (e.g. 'eu-west-1a', or a full https:// URL)")
+    pod = typer.prompt("Pod name (e.g. '10ax' for 10ax.online.tableau.com)")
     pat_name = typer.prompt("PAT name (the token's name, not its secret)", default="tca-collector")
     database = typer.prompt("Package file name", default=f"{site}.duckdb")
 

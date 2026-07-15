@@ -13,9 +13,9 @@
 # Your Tableau Cloud site name — the part after /site/ in your browser URL.
 site = "your-site-name"
 
-# Your pod hostname — the first part of your Tableau Cloud URL,
-# e.g. "eu-west-1a" for https://eu-west-1a.online.tableau.com
-pod = "eu-west-1a"
+# The bare pod name — the first label of your Tableau Cloud hostname,
+# e.g. "10ax" for https://10ax.online.tableau.com (not the full hostname/URL)
+pod = "10ax"
 
 # The NAME of the Personal Access Token (not the secret!), as shown in
 # Tableau Cloud under My Account Settings > Personal Access Tokens.
