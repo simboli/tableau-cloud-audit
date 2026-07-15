@@ -284,8 +284,21 @@ migrations (all idempotent, so pre-registry legacy files heal forward, incl.
 the stale file_info label) and **refuses files written by a newer collector**.
 There is no `tca migrate` command by design: every open migrates.
 
-Next milestones: remaining VDS sources (Tokens, Job Performance...), typed
-state layer, clear views / `tca peek`, OSS polish (CI, SECURITY.md).
+Done 2026-07-15 (evening): **VDS sources Tokens + Job Performance** — fourth
+manifest primitive: `email_columns` (reverse vault lookup email→U-####,
+case-insensitive on email OR username; unknown e-mails become `[redacted]`,
+never stored). Deliberately never requested: `Database User Name`,
+`Device Name`/`Device ID` (Tokens), `Error Message`, `Subscriber Email`,
+`Subscription Subject`, Bridge* fields (Job Performance — Error Message may
+embed credentials/e-mails; revisit later with dedicated sanitization if
+failure notes prove necessary). On the sandbox both sources returned an empty
+(all-null single row) extract — Admin Insights refreshes daily, data will
+appear; mechanics verified via unit tests.
+
+Next milestones: typed state layer, clear views / `tca peek`, OSS polish
+(CI, SECURITY.md, what-we-collect.md), remaining VDS backlog sources
+(Groups, Permissions, Subscriptions, Viz Load Times), history accumulation
+for job runs (dedup on Job LUID, like events).
 
 Backlog (agreed with maintainer):
 - **Clear views / `tca peek`**: local-only readable views joining `raw` with

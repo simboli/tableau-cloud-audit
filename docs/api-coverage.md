@@ -86,8 +86,8 @@ in the pseudonymisation manifest (`pseudo/manifest.py`) before they can be calle
 | Groups | same | Cross-check vs REST | **yes** | 💤 backlog |
 | Permissions | same | Cross-validation of permission data | **yes** | 💤 backlog |
 | Subscriptions | same | — | **yes** | 💤 backlog |
-| Tokens | same | PAT hygiene: stale tokens, leaver-owned tokens | **yes** | 💤 backlog |
-| Job Performance | same | Refresh failure rates, durations, queue delay | — | 📋 planned |
+| Tokens | same | PAT hygiene: stale tokens, leaver-owned tokens | **yes** — `Owner Email` → U-#### via reverse vault lookup (unknown → `[redacted]`); `Database User Name`/`Device Name` never requested | ✅ implemented (`activity` module) |
+| Job Performance | same | Refresh failure rates, durations, queue delay | **yes** — `Owner Email` → U-#### via reverse lookup; `Error Message`/`Subscriber Email`/Bridge fields never requested | ✅ implemented (`activity` module) |
 | Viz Load Times | same | Context only | — | 💤 backlog |
 
 Fallback chain (same package schema regardless of path): VDS → Hyper extract download → guided CSV import. Status: 💤 backlog.

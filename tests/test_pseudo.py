@@ -142,6 +142,23 @@ def test_nested_owner_is_pseudonymised(scrubber: Scrubber) -> None:
     assert out["workbooks"]["workbook"][0]["name"] == "Sales"  # content name in clear
 
 
+def test_vds_email_columns_resolve_via_vault(store: PackageStore, scrubber: Scrubber) -> None:
+    scrubber.scrub("/users", USERS_PAGE)  # vault now knows mario (U-0001)
+    tokens = {
+        "data": [
+            {"GUID": "t-1", "PAT Name": "ci-token", "Owner Email": "MARIO.ROSSI@acme.it"},
+            {"GUID": "t-2", "PAT Name": "old-token", "Owner Email": "ghost@nowhere.io"},
+            {"GUID": "t-3", "PAT Name": "svc-token", "Owner Email": ""},
+        ]
+    }
+    out = scrubber.scrub("vds:tokens", tokens)
+    t1, t2, t3 = out["data"]
+    assert t1["Owner Email"] == "U-0001"  # case-insensitive vault match
+    assert t2["Owner Email"] == "[redacted]"  # unknown e-mail never survives
+    assert t3["Owner Email"] == ""  # empty stays empty
+    assert t1["PAT Name"] == "ci-token"
+
+
 def test_connection_username_is_redacted(scrubber: Scrubber) -> None:
     payload = {
         "connections": {

@@ -393,6 +393,17 @@ class PackageStore:
         rows = self.con.execute("SELECT user_luid FROM identity.map").fetchall()
         return {r[0] for r in rows}
 
+    def pseudonym_by_email(self, email: str) -> str | None:
+        """Reverse vault lookup (case-insensitive) for sources that carry only
+        an e-mail (Tokens, Job Performance). Matches on email OR username —
+        Tableau Cloud usernames usually ARE the e-mail address."""
+        row = self.con.execute(
+            "SELECT pseudonym FROM identity.map "
+            "WHERE lower(email) = lower(?) OR lower(name) = lower(?)",
+            [email, email],
+        ).fetchone()
+        return str(row[0]) if row is not None else None
+
     # -- redacted export -----------------------------------------------------------
 
     def export_redacted(self, dest: Path) -> dict[str, int]:

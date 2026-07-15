@@ -132,6 +132,10 @@ class VdsSourceSpec:
     luid_column: str | None = None  # column holding the Tableau user LUID
     # vault attribute -> column caption; each listed column is replaced by U-####
     identity_attr_columns: dict[str, str] = field(default_factory=dict)
+    # columns holding a user E-MAIL with no LUID in the row (Tokens, Job
+    # Performance): resolved to U-#### via reverse vault lookup; e-mails not
+    # in the vault become '[redacted]'. Never stored as-is.
+    email_columns: tuple[str, ...] = ()
 
 
 VDS_MANIFEST: dict[str, VdsSourceSpec] = {
@@ -174,6 +178,60 @@ VDS_MANIFEST: dict[str, VdsSourceSpec] = {
             "email": "User Email",
             "full_name": "User Friendly Name",
         },
+    ),
+    "vds:tokens": VdsSourceSpec(
+        datasource_name="Tokens",
+        # NOTE: 'Database User Name' (credential user) and 'Device Name' /
+        # 'Device ID' (personal device identifiers) are deliberately NOT
+        # requested. 'PAT Name' is user-chosen but is how admins recognise
+        # tokens — kept, same policy as content names.
+        fields=(
+            "GUID",
+            "Token Identifier",
+            "Token Type",
+            "PAT Name",
+            "Issued At",
+            "Expires At",
+            "Last Used At",
+            "Last Updated",
+            "Database Type",
+            "Owner Email",  # -> U-#### via reverse vault lookup (see email_columns)
+        ),
+        email_columns=("Owner Email",),
+    ),
+    "vds:job_performance": VdsSourceSpec(
+        datasource_name="Job Performance",
+        # NOTE: 'Error Message' (may embed credentials/e-mails), 'Subscriber
+        # Email', 'Subscription Subject', 'Parent Project Owner Email' and the
+        # Bridge* fields are deliberately NOT requested.
+        fields=(
+            "Job ID",
+            "Job LUID",
+            "Job Type",
+            "Job Result",
+            "Final Job Result",
+            "Was Manual Run",
+            "Item ID",
+            "Item LUID",
+            "Item Type",
+            "Item Name",
+            "Parent Project Name",
+            "Schedule LUID",
+            "Schedule Name",
+            "Created At",
+            "Queued At",
+            "Started At",
+            "Completed At",
+            "Job Duration",
+            "Job Queued Duration",
+            "Job Execution Duration",
+            "Job Overflow Queued Duration",
+            "Was Overflow Queued",
+            "Extract File Size",
+            "Subscriber ID",  # numeric join key, not an identity
+            "Owner Email",  # -> U-#### via reverse vault lookup
+        ),
+        email_columns=("Owner Email",),
     ),
     "vds:site_content": VdsSourceSpec(
         datasource_name="Site Content",

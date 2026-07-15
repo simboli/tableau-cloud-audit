@@ -82,10 +82,13 @@ def test_activity_lands_scrubbed_vds_rows(httpx_mock: HTTPXMock, connected) -> N
     )
 
     for spec in VDS_MANIFEST.values():
+        luid = dict(AI).get(spec.datasource_name)
+        if luid is None:  # source not in this fake site (Tokens, Job Performance)
+            continue
         # metadata: expose all curated fields plus one extra we must NOT request
         httpx_mock.add_response(
             url=f"{VDS}/read-metadata",
-            match_json={"datasource": {"datasourceLuid": dict(AI)[spec.datasource_name]}},
+            match_json={"datasource": {"datasourceLuid": luid}},
             json=metadata_response([*spec.fields, "Actor User Name", "Owner Email"]),
         )
     httpx_mock.add_response(
@@ -192,7 +195,7 @@ def test_missing_admin_insights_is_skipped_not_fatal(httpx_mock: HTTPXMock, conn
     )
     ctx = make_ctx(client, store)
     stats = ActivityModule().run(ctx)  # must NOT raise
-    assert len(stats.denied) == 3  # all three sources unavailable
+    assert len(stats.denied) == len(VDS_MANIFEST)  # every source unavailable
     assert "vds:ts_users" not in stats.pages
 
 
@@ -209,14 +212,15 @@ def test_vds_403_is_skipped_not_fatal(httpx_mock: HTTPXMock, connected) -> None:
         )
     ctx = make_ctx(client, store)
     stats = ActivityModule().run(ctx)
-    assert len(stats.denied) == 3
+    # 3 present-but-denied (403) + the sources missing from the fake listing
+    assert len(stats.denied) == len(VDS_MANIFEST)
 
 
 def test_unregistered_vds_source_is_refused(connected) -> None:
     client, store = connected
     ctx = make_ctx(client, store)
     with pytest.raises(ScrubError, match="not registered"):
-        ctx.scrubber.scrub("vds:tokens", {"data": []})
+        ctx.scrubber.scrub("vds:viz_load_times", {"data": []})
 
 
 def test_vds_safety_net_blocks_leaked_email(connected) -> None:

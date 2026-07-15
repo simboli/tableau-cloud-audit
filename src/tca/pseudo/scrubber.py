@@ -64,10 +64,10 @@ class Scrubber:
             )
         sanitized = copy.deepcopy(payload)
         rows = sanitized.get("data", [])
-        if spec.luid_column is not None:
-            for row in rows:
-                if not isinstance(row, dict):
-                    raise ScrubError(f"VDS row in '{endpoint}' is not an object.")
+        for row in rows:
+            if not isinstance(row, dict):
+                raise ScrubError(f"VDS row in '{endpoint}' is not an object.")
+            if spec.luid_column is not None:
                 luid = row.get(spec.luid_column)
                 if not isinstance(luid, str) or not luid:
                     raise ScrubError(
@@ -84,6 +84,11 @@ class Scrubber:
                 for column in spec.identity_attr_columns.values():
                     if column in row:
                         row[column] = pseudonym
+            for column in spec.email_columns:
+                value = row.get(column)
+                if isinstance(value, str) and value:
+                    # reverse vault lookup; unknown e-mails never survive
+                    row[column] = self._store.pseudonym_by_email(value) or "[redacted]"
         self._safety_net(endpoint, sanitized)
         return sanitized
 
