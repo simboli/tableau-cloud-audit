@@ -1,0 +1,124 @@
+"""Pseudonymizer tests: manifest-driven scrubbing, pseudonym stability, safety net."""
+
+from pathlib import Path
+
+import pytest
+
+from tca.pseudo.scrubber import Scrubber, ScrubError
+from tca.storage.writer import PackageStore
+
+
+@pytest.fixture
+def store(tmp_path: Path):
+    with PackageStore(tmp_path / "test.duckdb") as s:
+        yield s
+
+
+@pytest.fixture
+def scrubber(store: PackageStore) -> Scrubber:
+    run_id = store.begin_run(modules=["rest_core"])
+    return Scrubber(store, run_id)
+
+
+USERS_PAGE = {
+    "pagination": {"pageNumber": "1", "pageSize": "100", "totalAvailable": "2"},
+    "users": {
+        "user": [
+            {
+                "id": "aa11bb22-0000-1111-2222-333344445555",
+                "name": "mario.rossi@acme.it",
+                "fullName": "Mario Rossi",
+                "email": "mario.rossi@acme.it",
+                "siteRole": "Creator",
+                "lastLogin": "2026-05-30T09:12:00Z",
+            },
+            {
+                "id": "cc33dd44-0000-1111-2222-333344445555",
+                "name": "lbianchi",
+                "fullName": "Lucia Bianchi",
+                "email": "lucia.bianchi@acme.it",
+                "externalAuthUserId": "lbianchi@corp",
+                "siteRole": "Viewer",
+            },
+        ]
+    },
+}
+
+
+def test_users_page_is_fully_pseudonymised(scrubber: Scrubber) -> None:
+    out = scrubber.scrub("/users", USERS_PAGE)
+    u1, u2 = out["users"]["user"]
+    assert u1["id"] == u1["name"] == u1["email"] == u1["fullName"] == "U-0001"
+    assert u2["id"] == "U-0002"
+    assert u2["externalAuthUserId"] == "U-0002"
+    # non-PII survives untouched
+    assert u1["siteRole"] == "Creator"
+    assert u1["lastLogin"] == "2026-05-30T09:12:00Z"
+    assert out["pagination"]["totalAvailable"] == "2"
+
+
+def test_original_payload_is_not_mutated(scrubber: Scrubber) -> None:
+    scrubber.scrub("/users", USERS_PAGE)
+    assert USERS_PAGE["users"]["user"][0]["email"] == "mario.rossi@acme.it"
+
+
+def test_pseudonyms_stable_across_endpoints_and_runs(
+    store: PackageStore, scrubber: Scrubber
+) -> None:
+    out1 = scrubber.scrub("/users", USERS_PAGE)
+    membership = {"users": {"user": [{"id": "aa11bb22-0000-1111-2222-333344445555"}]}}
+    out2 = scrubber.scrub("/groups/{luid}/users", membership)
+    assert out2["users"]["user"][0]["id"] == out1["users"]["user"][0]["id"] == "U-0001"
+
+    # new run, same person, same pseudonym
+    run2 = store.begin_run(modules=["rest_core"])
+    out3 = Scrubber(store, run2).scrub("/users", USERS_PAGE)
+    assert out3["users"]["user"][0]["id"] == "U-0001"
+
+
+def test_vault_captures_identity(store: PackageStore, scrubber: Scrubber) -> None:
+    scrubber.scrub("/users", USERS_PAGE)
+    row = store.resolve("U-0001")
+    assert row["email"] == "mario.rossi@acme.it"
+    assert row["full_name"] == "Mario Rossi"
+    assert row["user_luid"] == "aa11bb22-0000-1111-2222-333344445555"
+
+
+def test_groups_pass_through_untouched(scrubber: Scrubber) -> None:
+    groups = {"groups": {"group": [{"id": "g-1", "name": "Finance & Controlling"}]}}
+    assert scrubber.scrub("/groups", groups) == groups
+
+
+def test_unregistered_endpoint_is_refused(scrubber: Scrubber) -> None:
+    with pytest.raises(ScrubError, match="not registered"):
+        scrubber.scrub("/workbooks", {"workbooks": {}})
+
+
+def test_user_object_without_id_is_refused(scrubber: Scrubber) -> None:
+    with pytest.raises(ScrubError, match="no 'id'"):
+        scrubber.scrub("/users", {"users": {"user": [{"name": "ghost"}]}})
+
+
+def test_safety_net_blocks_surviving_email(scrubber: Scrubber) -> None:
+    # a group whose name embeds an e-mail: no manifest path covers it -> block
+    sneaky = {"groups": {"group": [{"id": "g-1", "name": "owners: mario.rossi@acme.it"}]}}
+    with pytest.raises(ScrubError, match="e-mail-shaped"):
+        scrubber.scrub("/groups", sneaky)
+
+
+def test_safety_net_blocks_known_luid_leak(scrubber: Scrubber) -> None:
+    scrubber.scrub("/users", USERS_PAGE)  # vault now knows the LUIDs
+    leak = {"groups": {"group": [{"id": "g-1", "owner": "aa11bb22-0000-1111-2222-333344445555"}]}}
+    with pytest.raises(ScrubError, match="LUID"):
+        scrubber.scrub("/groups", leak)
+
+
+def test_single_object_instead_of_list(scrubber: Scrubber) -> None:
+    # Tableau REST sometimes returns a bare object where a list is expected
+    page = {"users": {"user": {"id": "ee55ff66-0000-1111-2222-333344445555", "name": "solo"}}}
+    out = scrubber.scrub("/users", page)
+    assert out["users"]["user"]["id"] == "U-0001"
+
+
+def test_empty_page_is_fine(scrubber: Scrubber) -> None:
+    assert scrubber.scrub("/users", {"users": {}}) == {"users": {}}
