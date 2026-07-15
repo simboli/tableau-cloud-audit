@@ -188,8 +188,15 @@ def collect(
     modules: str = typer.Option(
         "rest_core,content", "--modules", "-m", help="Comma-separated module names."
     ),
+    resume: bool = typer.Option(
+        False, "--resume", help="Continue the last interrupted run instead of starting a new one."
+    ),
 ) -> None:
-    """Run a collection: fetch, pseudonymise, land into the package file."""
+    """Run a collection: fetch, pseudonymise, land into the package file.
+
+    Every landed page commits immediately: an interrupted run (crash, Ctrl-C)
+    loses nothing and continues with `tca collect --resume`.
+    """
     started = time.monotonic()
     try:
         cfg = Config.load(config)
@@ -210,9 +217,30 @@ def collect(
 
             with PackageStore(cfg.database_path, key) as store:
                 store.init_file_info(client.site_luid, cfg.site, cfg.pod)
-                run_id = store.begin_run(
-                    modules=[m.name for m in selected], rest_api_version=client.api_version
-                )
+
+                done: set[tuple[str, str | None, int]] = set()
+                if resume:
+                    run_id_or_none = store.resumable_run()
+                    if run_id_or_none is None:
+                        raise _fail("Nothing to resume: no interrupted run found.")
+                    run_id = run_id_or_none
+                    store.reopen_run(run_id)
+                    done = store.landed_units(run_id)
+                    console.print(
+                        f"[green]✓[/green] resuming run #{run_id} — "
+                        f"{len(done)} pages already collected"
+                    )
+                else:
+                    stale = store.abort_stale_runs()
+                    if stale:
+                        console.print(
+                            f"[yellow]⚠ {stale} interrupted run(s) marked as aborted "
+                            "(use --resume next time to continue them instead).[/yellow]"
+                        )
+                    run_id = store.begin_run(
+                        modules=[m.name for m in selected], rest_api_version=client.api_version
+                    )
+
                 ctx = modules_base.RunContext(
                     rest=TableauRest(client),
                     store=store,
@@ -221,18 +249,33 @@ def collect(
                     on_page=lambda endpoint, page: console.print(
                         f"  [dim]{endpoint} — page {page}[/dim]"
                     ),
+                    done=done,
                 )
                 all_stats: dict[str, int] = {}
+                skipped = 0
                 try:
-                    with store.transaction():
-                        for module in selected:
-                            console.print(f"[bold]→ module {module.name}[/bold]")
-                            stats = module.run(ctx)
-                            all_stats.update(stats.pages)
+                    for module in selected:
+                        console.print(f"[bold]→ module {module.name}[/bold]")
+                        stats = module.run(ctx)
+                        all_stats.update(stats.pages)
+                        skipped += stats.skipped
+                except KeyboardInterrupt:
+                    store.finish_run(run_id, "partial", notes="interrupted by user")
+                    console.print(
+                        f"\n[yellow]Interrupted. Run #{run_id} is resumable: "
+                        "tca collect --resume[/yellow]"
+                    )
+                    raise typer.Exit(code=130) from None
                 except Exception as exc:
-                    store.finish_run(run_id, "failed", notes=str(exc)[:500])
+                    store.finish_run(run_id, "partial", notes=str(exc)[:500])
+                    console.print(
+                        f"[yellow]Run #{run_id} stopped early and is resumable: "
+                        "tca collect --resume[/yellow]"
+                    )
                     raise
                 store.finish_run(run_id, "ok")
+                if skipped:
+                    console.print(f"[dim]{skipped} already-collected pages skipped (resume)[/dim]")
                 _print_run_report(store, run_id, all_stats, time.monotonic() - started)
         finally:
             client.signout()

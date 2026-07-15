@@ -261,6 +261,19 @@ Lessons from the live test (already encoded in code/tests):
   on signin even with a valid PAT.
 - Tableau signout replies 204 No Content; the client treats empty bodies as `{}`.
 
-Next milestones (not started): content inventory endpoints (projects/workbooks/
-datasources — need manifest entries for `owner`), checkpoint/resume, typed
-state/history layer, redacted export for analyst delivery.
+Done since: content inventory module (`content`), redacted export (`tca export`).
+
+Next milestones: checkpoint/resume (in progress), permissions module, VDS/Admin
+Insights activity module, typed state/history layer.
+
+Backlog (agreed with maintainer):
+- **Clear views / `tca peek`**: local-only readable views joining `raw` with
+  `identity.map` so the CLIENT sees real names when browsing their own file; computed
+  at read time, nothing stored, structurally impossible on the export (no identity
+  schema there). Agreed 2026-07-15 as the answer to "can't the client see clear
+  data?" without moving PII into raw.
+- Progress bar for per-item loops in `collect` (current per-page println is noisy).
+- Checkpoint/resume design (decided): **`raw.api_responses` IS the checkpoint** —
+  units keyed by (run_id, endpoint, entity_luid, page); resume skips landed units.
+  Consequence: per-page commits instead of one transaction per run; run `status`
+  carries the truth (ok=complete, partial=interrupted/resumable, failed, aborted).

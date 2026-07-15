@@ -1,9 +1,10 @@
 """The content-inventory module: projects, workbooks, views, datasources,
 and per-item connections.
 
-Cheap listings first, per-item connection calls last (the expensive loop).
-Owners inside content objects are pseudonymised by the scrubber; connection
-credential usernames are redacted (see the manifest for both rules).
+Cheap listings first, per-item connection calls last (the expensive loop —
+which is exactly where resume pays off: already-landed items are skipped
+without an API call). Owners inside content objects are pseudonymised by the
+scrubber; connection credential usernames are redacted (see the manifest).
 """
 
 from __future__ import annotations
@@ -29,59 +30,41 @@ class ContentModule:
         stats = ModuleStats()
 
         for page, payload in ctx.rest.projects():
-            ctx.store.write_response(
-                ctx.run_id, PROJECTS, ctx.scrubber.scrub(PROJECTS, payload), page=page
-            )
-            stats.add_page(PROJECTS)
-            ctx.on_page(PROJECTS, page)
+            stats.count(PROJECTS, ctx.land(PROJECTS, payload, page=page))
 
         workbook_luids: list[str] = []
         for page, payload in ctx.rest.workbooks():
-            ctx.store.write_response(
-                ctx.run_id, WORKBOOKS, ctx.scrubber.scrub(WORKBOOKS, payload), page=page
-            )
-            stats.add_page(WORKBOOKS)
-            ctx.on_page(WORKBOOKS, page)
+            stats.count(WORKBOOKS, ctx.land(WORKBOOKS, payload, page=page))
             workbook_luids.extend(_item_ids(payload, "workbooks", "workbook"))
 
         for page, payload in ctx.rest.views():
-            ctx.store.write_response(
-                ctx.run_id, VIEWS, ctx.scrubber.scrub(VIEWS, payload), page=page
-            )
-            stats.add_page(VIEWS)
-            ctx.on_page(VIEWS, page)
+            stats.count(VIEWS, ctx.land(VIEWS, payload, page=page))
 
         datasource_luids: list[str] = []
         for page, payload in ctx.rest.datasources():
-            ctx.store.write_response(
-                ctx.run_id, DATASOURCES, ctx.scrubber.scrub(DATASOURCES, payload), page=page
-            )
-            stats.add_page(DATASOURCES)
-            ctx.on_page(DATASOURCES, page)
+            stats.count(DATASOURCES, ctx.land(DATASOURCES, payload, page=page))
             datasource_luids.extend(_item_ids(payload, "datasources", "datasource"))
 
-        # per-item calls last: the expensive loop
+        # per-item calls last: the expensive loop, and the resume sweet spot
         for workbook_luid in workbook_luids:
+            if ctx.is_done(WORKBOOK_CONNECTIONS, workbook_luid):
+                stats.count(WORKBOOK_CONNECTIONS, written=False)
+                continue
             payload = ctx.rest.workbook_connections(workbook_luid)
-            ctx.store.write_response(
-                ctx.run_id,
+            stats.count(
                 WORKBOOK_CONNECTIONS,
-                ctx.scrubber.scrub(WORKBOOK_CONNECTIONS, payload),
-                entity_luid=workbook_luid,
+                ctx.land(WORKBOOK_CONNECTIONS, payload, entity_luid=workbook_luid),
             )
-            stats.add_page(WORKBOOK_CONNECTIONS)
-            ctx.on_page(WORKBOOK_CONNECTIONS, 1)
 
         for datasource_luid in datasource_luids:
+            if ctx.is_done(DATASOURCE_CONNECTIONS, datasource_luid):
+                stats.count(DATASOURCE_CONNECTIONS, written=False)
+                continue
             payload = ctx.rest.datasource_connections(datasource_luid)
-            ctx.store.write_response(
-                ctx.run_id,
+            stats.count(
                 DATASOURCE_CONNECTIONS,
-                ctx.scrubber.scrub(DATASOURCE_CONNECTIONS, payload),
-                entity_luid=datasource_luid,
+                ctx.land(DATASOURCE_CONNECTIONS, payload, entity_luid=datasource_luid),
             )
-            stats.add_page(DATASOURCE_CONNECTIONS)
-            ctx.on_page(DATASOURCE_CONNECTIONS, 1)
 
         return stats
 

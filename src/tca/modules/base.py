@@ -27,14 +27,41 @@ class RunContext:
     # Called with (endpoint, page) after each landed page — the CLI uses it
     # for progress output; modules stay console-agnostic.
     on_page: Callable[[str, int], None] = lambda endpoint, page: None
+    # Units already landed in this run (populated on --resume; empty otherwise).
+    # raw.api_responses is the checkpoint: one unit = (endpoint, entity_luid, page).
+    done: set[tuple[str, str | None, int]] = field(default_factory=set)
+
+    def is_done(self, endpoint: str, entity_luid: str | None = None, page: int = 1) -> bool:
+        return (endpoint, entity_luid, page) in self.done
+
+    def land(
+        self,
+        endpoint: str,
+        payload: dict,  # type: ignore[type-arg]
+        page: int = 1,
+        entity_luid: str | None = None,
+    ) -> bool:
+        """Scrub + write one page, unless it already landed (resume). Returns
+        True when the page was written, False when skipped."""
+        if self.is_done(endpoint, entity_luid, page):
+            return False
+        clean = self.scrubber.scrub(endpoint, payload)
+        self.store.write_response(self.run_id, endpoint, clean, page=page, entity_luid=entity_luid)
+        self.done.add((endpoint, entity_luid, page))
+        self.on_page(endpoint, page)
+        return True
 
 
 @dataclass
 class ModuleStats:
     pages: dict[str, int] = field(default_factory=dict)
+    skipped: int = 0  # units already landed before this run attempt (resume)
 
-    def add_page(self, endpoint: str) -> None:
-        self.pages[endpoint] = self.pages.get(endpoint, 0) + 1
+    def count(self, endpoint: str, written: bool) -> None:
+        if written:
+            self.pages[endpoint] = self.pages.get(endpoint, 0) + 1
+        else:
+            self.skipped += 1
 
 
 class Module(Protocol):

@@ -167,6 +167,44 @@ class PackageStore:
             [_now(), status, notes, run_id],
         )
 
+    # -- resume support -------------------------------------------------------
+
+    def resumable_run(self) -> int | None:
+        """The most recent interrupted run (crashed or Ctrl-C'd), if any."""
+        row = self.con.execute(
+            "SELECT max(run_id) FROM meta.collection_runs WHERE status IN ('running', 'partial')"
+        ).fetchone()
+        return int(row[0]) if row is not None and row[0] is not None else None
+
+    def reopen_run(self, run_id: int) -> None:
+        self.con.execute(
+            "UPDATE meta.collection_runs SET status = 'running', finished_at = NULL "
+            "WHERE run_id = ?",
+            [run_id],
+        )
+
+    def abort_stale_runs(self) -> int:
+        """Mark leftover 'running'/'partial' runs as aborted (a NEW run supersedes them)."""
+        before = self.con.execute(
+            "SELECT count(*) FROM meta.collection_runs WHERE status IN ('running', 'partial')"
+        ).fetchone()
+        self.con.execute(
+            "UPDATE meta.collection_runs SET status = 'aborted', "
+            "finished_at = coalesce(finished_at, ?) "
+            "WHERE status IN ('running', 'partial')",
+            [_now()],
+        )
+        assert before is not None
+        return int(before[0])
+
+    def landed_units(self, run_id: int) -> set[tuple[str, str | None, int]]:
+        """Everything already collected in a run — the checkpoint IS raw itself."""
+        rows = self.con.execute(
+            "SELECT endpoint, entity_luid, page FROM raw.api_responses WHERE run_id = ?",
+            [run_id],
+        ).fetchall()
+        return {(r[0], r[1], int(r[2])) for r in rows}
+
     # -- raw ---------------------------------------------------------------------
 
     def write_response(
