@@ -78,9 +78,15 @@ in the pseudonymisation manifest (`pseudo/manifest.py`) before they can be calle
 
 ## VizQL Data Service — Admin Insights (time dimension)
 
+Before querying each datasource, the collector calls
+`POST /api/v1/vizql-data-service/read-metadata` (✅ implemented) to learn which
+field captions the datasource actually exposes — the curated field lists in the
+manifest are intersected with reality, since captions drift across Tableau
+releases. `tca verify` uses the same call to check VDS access at kick-off.
+
 | Datasource queried | Endpoint | Purpose | PII | Status |
 |---|---|---|---|---|
-| TS Events | `POST /api/v1/vizql-data-service/query-datasource` | Event log: sign-ins, views, publishes (90/365d window) | minimized — identity columns (`Actor User Name`, `Item Owner Email`) never requested; numeric ids kept as join keys | ✅ implemented (`activity` module) |
+| TS Events | `POST /api/v1/vizql-data-service/query-datasource` | Event log: sign-ins, views, publishes (90/365d window); rows also accumulate into `history.events` (dedup on Event Id — outlives retention) | minimized — identity columns (`Actor User Name`, `Item Owner Email`) never requested; numeric ids kept as join keys | ✅ implemented (`activity` module) |
 | TS Users | same | Last login beyond 90d, license role, activity aggregates | **yes** — `User LUID`/`User Name`/`User Email`/`User Friendly Name` → U-#### via vault | ✅ implemented (`activity` module) |
 | Site Content | same | Last Accessed At — the zombie-detection backbone | minimized — `Owner Email`, `Item Parent Project Owner Email`, `Description` never requested | ✅ implemented (`activity` module) |
 | Groups | same | Cross-check vs REST | **yes** | 💤 backlog |
