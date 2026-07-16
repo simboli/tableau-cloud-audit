@@ -367,6 +367,15 @@ Cookbook → API coverage → Troubleshooting.
 Docs backlog: CHANGELOG.md (required before the v0.1.0 release), contributor
 architecture map in CONTRIBUTING.
 
+**Deferred until the repo goes public (maintainer's decision, 2026-07-16):**
+GitHub Pages activation. The repo is currently PRIVATE and on the Free plan
+Pages only works on public repos (and the site would be public regardless).
+When Nicola flips visibility: push must include `.github/workflows/ci.yml`
+→ first CI run on main creates the `gh-pages` branch via `mkdocs gh-deploy`
+→ Settings → Pages → Deploy from a branch → `gh-pages` + `/ (root)` → Save
+→ site at https://simboli.github.io/tableau-cloud-audit/. Going public is
+"the launch" — his call on timing.
+
 Backlog (agreed with maintainer):
 - **Clear views / `tca peek`**: local-only readable views joining `raw` with
   `identity.map` so the CLIENT sees real names when browsing their own file; computed

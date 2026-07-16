@@ -16,6 +16,13 @@ API = f"{BASE}/api/3.26/sites/{SITE_LUID}"
 runner = CliRunner()
 
 
+def plain(output: str) -> str:
+    """Collapse whitespace: rich wraps lines at terminal width, and the wrap
+    point depends on tmp-path lengths — different on CI vs locally. Assert
+    against the normalized text, never the raw wrapped output."""
+    return " ".join(output.split())
+
+
 @pytest.fixture
 def workdir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.chdir(tmp_path)
@@ -74,7 +81,7 @@ def test_init_writes_config_and_creates_file(workdir: Path) -> None:
     assert result.exit_code == 0, result.output
     assert (workdir / "collector.toml").exists()
     assert (workdir / "acme.duckdb").exists()
-    assert "NOT be encrypted" in result.output  # no TCA_DB_KEY set
+    assert "NOT be encrypted" in plain(result.output)  # no TCA_DB_KEY set
     content = (workdir / "collector.toml").read_text()
     assert 'site = "acme"' in content
     assert "TCA_PAT_SECRET" in content  # the "secrets don't go here" comment
@@ -97,8 +104,8 @@ def test_verify_happy_path(workdir: Path, httpx_mock: HTTPXMock) -> None:
     )
     result = runner.invoke(app, ["verify"])
     assert result.exit_code == 0, result.output
-    assert "All checks passed" in result.output
-    assert "Admin Insights datasources not found" in result.output
+    assert "All checks passed" in plain(result.output)
+    assert "Admin Insights datasources not found" in plain(result.output)
     assert SITE_LUID in result.output
 
 
@@ -107,7 +114,7 @@ def test_verify_fails_without_secret(workdir: Path, monkeypatch: pytest.MonkeyPa
     monkeypatch.delenv(PAT_SECRET_ENV)
     result = runner.invoke(app, ["verify"])
     assert result.exit_code == 1
-    assert "TCA_PAT_SECRET" in result.output
+    assert "TCA_PAT_SECRET" in plain(result.output)
 
 
 def test_collect_end_to_end_then_summary_and_resolve(workdir: Path, httpx_mock: HTTPXMock) -> None:
@@ -118,13 +125,13 @@ def test_collect_end_to_end_then_summary_and_resolve(workdir: Path, httpx_mock: 
     # explicit module list: the content module's endpoints are not mocked here
     result = runner.invoke(app, ["collect", "--modules", "rest_core"])
     assert result.exit_code == 0, result.output
-    assert "run #1" in result.output
-    assert "No real identities" in result.output
+    assert "run #1" in plain(result.output)
+    assert "No real identities" in plain(result.output)
 
     result = runner.invoke(app, ["summary"])
     assert result.exit_code == 0, result.output
     assert "acme" in result.output
-    assert "collection runs" in result.output
+    assert "collection runs" in plain(result.output)
 
     result = runner.invoke(app, ["resolve", "U-0001"])
     assert result.exit_code == 0, result.output
@@ -132,21 +139,21 @@ def test_collect_end_to_end_then_summary_and_resolve(workdir: Path, httpx_mock: 
 
     result = runner.invoke(app, ["resolve", "U-9999"])
     assert result.exit_code == 1
-    assert "not in the identity vault" in result.output
+    assert "not in the identity vault" in plain(result.output)
 
 
 def test_collect_unknown_module(workdir: Path) -> None:
     write_config(workdir)
     result = runner.invoke(app, ["collect", "--modules", "nope"])
     assert result.exit_code == 1
-    assert "Unknown module" in result.output
+    assert "Unknown module" in plain(result.output)
 
 
 def test_summary_without_file(workdir: Path) -> None:
     write_config(workdir)
     result = runner.invoke(app, ["summary"])
     assert result.exit_code == 1
-    assert "tca collect" in result.output
+    assert "tca collect" in plain(result.output)
 
 
 def test_export_after_collect(workdir: Path, httpx_mock: HTTPXMock) -> None:
@@ -159,7 +166,7 @@ def test_export_after_collect(workdir: Path, httpx_mock: HTTPXMock) -> None:
     assert result.exit_code == 0, result.output
     assert (workdir / "acme-export.duckdb").exists()
     assert (workdir / "acme-export.duckdb.sha256").exists()
-    assert "identity vault NOT exported" in result.output
+    assert "identity vault NOT exported" in plain(result.output)
 
     # second run refuses, --force overwrites
     result = runner.invoke(app, ["export"])
