@@ -28,6 +28,7 @@ nav:
   - Home: index.md
   - What we collect: what-we-collect.md
   - Package file schema: package-file-schema.md
+  - Query cookbook: cookbook.md
   - API coverage: api-coverage.md
   - Troubleshooting: troubleshooting.md
 

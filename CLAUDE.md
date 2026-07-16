@@ -351,12 +351,15 @@ subscriptions — F-05 data), remaining VDS backlog sources, typed state for
 VDS sources, history accumulation for job runs, Metadata API (big), PyPI
 release (tag v0.1.0 once CI is green on GitHub).
 
-Docs backlog (agreed 2026-07-16): prerequisites/kick-off guide (PAT creation
-step-by-step, Site Administrator requirement, Admin Insights provisioning,
-works-council note), CLI reference page, CHANGELOG.md (required before the
-v0.1.0 release), SQL query cookbook (5-6 teaser recipes only — advanced
-analyses are the paid product, do not give away the moat), contributor
-architecture map in CONTRIBUTING.
+Done 2026-07-16 (later still): `docs/cookbook.md` — 7 starter recipes, every
+query validated against the live sandbox file before publishing; teaser depth
+only (moat rule respected: no effective permissions, no tiering, no scoring;
+closing line points at the deeper questions without answering them).
+
+Docs backlog: prerequisites/kick-off guide (PAT creation step-by-step, Site
+Administrator requirement, Admin Insights provisioning, works-council note),
+CLI reference page, CHANGELOG.md (required before the v0.1.0 release),
+contributor architecture map in CONTRIBUTING.
 
 Backlog (agreed with maintainer):
 - **Clear views / `tca peek`**: local-only readable views joining `raw` with

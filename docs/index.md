@@ -52,6 +52,8 @@ tca export            # the shareable copy: everything EXCEPT the identity vault
 - [What we collect](what-we-collect.md) — field-level transparency
 - [Package file schema](package-file-schema.md) — table-by-table guide for
   querying the file
+- [Query cookbook](cookbook.md) — starter recipes: inactive users, "All
+  Users" grants, zombie sweep, embedded credentials…
 - [API coverage](api-coverage.md) — every endpoint, with implementation status
 - [Troubleshooting](troubleshooting.md) — symptoms → cause → fix
 - [Security policy](https://github.com/simboli/tableau-cloud-audit/blob/main/SECURITY.md)
