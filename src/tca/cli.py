@@ -27,6 +27,7 @@ from tca.config import (
 )
 from tca.modules import base as modules_base
 from tca.modules.activity import ActivityModule  # noqa: F401  (registers itself)
+from tca.modules.automation import AutomationModule  # noqa: F401  (registers itself)
 from tca.modules.content import ContentModule  # noqa: F401  (registers itself)
 from tca.modules.permissions import PermissionsModule  # noqa: F401  (registers itself)
 from tca.modules.rest_core import RestCoreModule  # noqa: F401  (registers itself)
@@ -227,7 +228,7 @@ def _verify_admin_insights(client: RestClient) -> None:
 def collect(
     config: Path = CONFIG_OPTION,
     modules: str = typer.Option(
-        "rest_core,content,permissions,activity",
+        "rest_core,content,automation,permissions,activity",
         "--modules",
         "-m",
         help="Comma-separated module names.",

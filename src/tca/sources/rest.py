@@ -22,6 +22,9 @@ VIEWS = "/views"
 DATASOURCES = "/datasources"
 WORKBOOK_CONNECTIONS = "/workbooks/{luid}/connections"
 DATASOURCE_CONNECTIONS = "/datasources/{luid}/connections"
+EXTRACT_REFRESH_TASKS = "/tasks/extractRefreshes"
+JOBS = "/jobs"
+SUBSCRIPTIONS = "/subscriptions"
 PROJECT_PERMISSIONS = "/projects/{luid}/permissions"
 PROJECT_DEFAULT_PERMISSIONS_WORKBOOKS = "/projects/{luid}/default-permissions/workbooks"
 PROJECT_DEFAULT_PERMISSIONS_DATASOURCES = "/projects/{luid}/default-permissions/datasources"
@@ -69,6 +72,18 @@ class TableauRest:
 
     def datasource_connections(self, datasource_luid: str) -> dict[str, Any]:
         return self._client.get_site(DATASOURCE_CONNECTIONS.replace("{luid}", datasource_luid))
+
+    # -- automation & schedules ----------------------------------------------------
+
+    def extract_refresh_tasks(self) -> Iterator[Page]:
+        return self._client.paginate(EXTRACT_REFRESH_TASKS)
+
+    def jobs(self) -> Iterator[Page]:
+        """Background job history (Tableau returns the recent window)."""
+        return self._client.paginate(JOBS)
+
+    def subscriptions(self) -> Iterator[Page]:
+        return self._client.paginate(SUBSCRIPTIONS)
 
     # -- permissions (all single, unpaginated responses) --------------------------
 

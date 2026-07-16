@@ -35,6 +35,9 @@ EXCEPT for the identity replacements listed here.
 | `/datasources` | name, certified flag, extracts flag, type | `owner` → U-#### |
 | `/workbooks/{luid}/connections`, `/datasources/{luid}/connections` | connection type, server address, embed-password flag | credential `userName` → [redacted] |
 | `/projects/{luid}/permissions`, `/projects/{luid}/default-permissions/workbooks`, `/projects/{luid}/default-permissions/datasources`, `/workbooks/{luid}/permissions`, `/datasources/{luid}/permissions` | grantee × capability rules, Allow/Deny | user grantees and owners → U-####; group grantees kept in clear |
+| `/tasks/extractRefreshes` | refresh tasks: target, schedule, priority, consecutive failures | — |
+| `/jobs` | background job history: type, status, timestamps | — |
+| `/subscriptions` | subscription subject, target content, schedule | subscriber `user` → U-#### |
 | `/serverinfo` | REST API version (not stored) | — |
 
 ## Admin Insights (VizQL Data Service)

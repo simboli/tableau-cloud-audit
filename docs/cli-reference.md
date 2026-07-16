@@ -49,7 +49,7 @@ interrupted run loses nothing.
 
 | Option | Effect |
 |---|---|
-| `--modules/-m LIST` | Comma-separated module list. Default: `rest_core,content,permissions,activity` |
+| `--modules/-m LIST` | Comma-separated module list. Default: `rest_core,content,automation,permissions,activity` |
 | `--resume` | Continue the most recent interrupted run instead of starting a new one |
 
 Modules:
@@ -58,6 +58,7 @@ Modules:
 |---|---|
 | `rest_core` | users, groups, group membership |
 | `content` | projects, workbooks, views, datasources, per-item connections |
+| `automation` | extract refresh tasks, background job history, subscriptions |
 | `permissions` | project rules, default templates, per-item workbook/datasource rules |
 | `activity` | Admin Insights via VDS: TS Events (also accumulated into `history.events`), TS Users, Site Content, Tokens, Job Performance |
 

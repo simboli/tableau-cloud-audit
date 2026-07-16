@@ -62,9 +62,9 @@ in the pseudonymisation manifest (`pseudo/manifest.py`) before they can be calle
 
 | Endpoint | Method | Purpose | PII | Status |
 |---|---|---|---|---|
-| `/api/{v}/sites/{site}/tasks/extractRefreshes` | GET (paginated) | Extract refresh tasks: target, frequency, failures | — | 📋 planned |
-| `/api/{v}/sites/{site}/jobs?filter=…` | GET (paginated) | Job history: status, duration, failure notes | — | 📋 planned |
-| `/api/{v}/sites/{site}/subscriptions` | GET (paginated) | Subscriptions (incl. to zombie content) | **yes** (user) | 📋 planned |
+| `/api/{v}/sites/{site}/tasks/extractRefreshes` | GET (paginated) | Extract refresh tasks: target, frequency, consecutive failures | — | ✅ implemented (`automation` module) |
+| `/api/{v}/sites/{site}/jobs` | GET (paginated) | Background job history: status, timestamps | — | ✅ implemented (`automation` module) |
+| `/api/{v}/sites/{site}/subscriptions` | GET (paginated) | Subscriptions (incl. to zombie content) | **yes** (subscriber → U-####) | ✅ implemented (`automation` module) |
 | `/api/{v}/sites/{site}/dataAlerts` | GET (paginated) | Data-driven alerts | **yes** (user) | 💤 backlog |
 
 ## REST — security posture & platform config

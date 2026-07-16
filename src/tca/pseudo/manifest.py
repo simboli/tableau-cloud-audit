@@ -72,6 +72,12 @@ MANIFEST: dict[str, EndpointSpec] = {
     "/datasources/{luid}/connections": EndpointSpec(
         redact_paths=["connections.connection[*].userName"]
     ),
+    # -- automation & schedules -------------------------------------------------
+    # Extract refresh tasks and background jobs carry no user objects; the
+    # subscription owner is a Tableau user -> pseudonymised.
+    "/tasks/extractRefreshes": EndpointSpec(),
+    "/jobs": EndpointSpec(),
+    "/subscriptions": EndpointSpec(user_paths=["subscriptions.subscription[*].user"]),
     # -- permissions -----------------------------------------------------------
     # Users appear as grantees (granteeCapabilities[*].user) and as the owner
     # of the target item; GROUP grantees stay in the clear by design.

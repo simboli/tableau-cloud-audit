@@ -364,17 +364,24 @@ options, env vars, exit codes 0/1/130, module table, run statuses). Site nav
 order: Home → Getting ready → CLI reference → What we collect → Schema →
 Cookbook → API coverage → Troubleshooting.
 
-Docs backlog: CHANGELOG.md (required before the v0.1.0 release), contributor
-architecture map in CONTRIBUTING.
+Done 2026-07-16 (Phase 0 of the launch plan): **`automation` module**
+(/tasks/extractRefreshes, /jobs, /subscriptions — subscriber user
+pseudonymised; sandbox has none of these, empty listings land fine; default
+modules now rest_core,content,automation,permissions,activity) and
+**CHANGELOG.md** (Keep a Changelog format, v0.1.0 dated 2026-07-16).
+Release checklist remaining: git tag v0.1.0 (maintainer), demo GIF for the
+README, PyPI publish, then repo → public per Launch_Plan.md.
 
-**Deferred until the repo goes public (maintainer's decision, 2026-07-16):**
-GitHub Pages activation. The repo is currently PRIVATE and on the Free plan
-Pages only works on public repos (and the site would be public regardless).
-When Nicola flips visibility: push must include `.github/workflows/ci.yml`
-→ first CI run on main creates the `gh-pages` branch via `mkdocs gh-deploy`
-→ Settings → Pages → Deploy from a branch → `gh-pages` + `/ (root)` → Save
-→ site at https://simboli.github.io/tableau-cloud-audit/. Going public is
-"the launch" — his call on timing.
+Docs backlog: contributor architecture map in CONTRIBUTING.
+
+**GitHub setup status (2026-07-16):** Nicola has GitHub Pro; CI is pushed and
+GREEN (after fixing a rich line-wrap flake in test_cli assertions — the
+`plain()` helper normalizes output whitespace; wrap points depend on tmp-path
+lengths, CI≠local). `gh-pages` branch created by the docs job; Pages
+configured (deploy from `gh-pages` + root). Site:
+https://simboli.github.io/tableau-cloud-audit/ — note it is PUBLICLY
+reachable even while the repo is private; only public-safe docs are
+published. Repo going public ("the launch") is still his call.
 
 Backlog (agreed with maintainer):
 - **Clear views / `tca peek`**: local-only readable views joining `raw` with
