@@ -53,6 +53,7 @@ tca export            # the shareable copy: everything EXCEPT the identity vault
 - [Package file schema](package-file-schema.md) — table-by-table guide for
   querying the file
 - [API coverage](api-coverage.md) — every endpoint, with implementation status
+- [Troubleshooting](troubleshooting.md) — symptoms → cause → fix
 - [Security policy](https://github.com/simboli/tableau-cloud-audit/blob/main/SECURITY.md)
   · [Contributing](https://github.com/simboli/tableau-cloud-audit/blob/main/CONTRIBUTING.md)
 

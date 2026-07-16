@@ -29,6 +29,7 @@ nav:
   - What we collect: what-we-collect.md
   - Package file schema: package-file-schema.md
   - API coverage: api-coverage.md
+  - Troubleshooting: troubleshooting.md
 
 markdown_extensions:
   - admonition
