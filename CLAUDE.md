@@ -356,10 +356,16 @@ query validated against the live sandbox file before publishing; teaser depth
 only (moat rule respected: no effective permissions, no tiering, no scoring;
 closing line points at the deeper questions without answering them).
 
-Docs backlog: prerequisites/kick-off guide (PAT creation step-by-step, Site
-Administrator requirement, Admin Insights provisioning, works-council note),
-CLI reference page, CHANGELOG.md (required before the v0.1.0 release),
-contributor architecture map in CONTRIBUTING.
+Done 2026-07-16 (docs day, cont.): `docs/getting-ready.md` (kick-off guide:
+PAT step-by-step with 15-day expiry note, contentUrl-vs-display-name trap,
+pod, Admin Insights provisioning, encryption decision, works-council/legal
+section, final checklist) and `docs/cli-reference.md` (all 7 commands,
+options, env vars, exit codes 0/1/130, module table, run statuses). Site nav
+order: Home → Getting ready → CLI reference → What we collect → Schema →
+Cookbook → API coverage → Troubleshooting.
+
+Docs backlog: CHANGELOG.md (required before the v0.1.0 release), contributor
+architecture map in CONTRIBUTING.
 
 Backlog (agreed with maintainer):
 - **Clear views / `tca peek`**: local-only readable views joining `raw` with

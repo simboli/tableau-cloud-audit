@@ -26,6 +26,8 @@ theme:
 
 nav:
   - Home: index.md
+  - Getting ready: getting-ready.md
+  - CLI reference: cli-reference.md
   - What we collect: what-we-collect.md
   - Package file schema: package-file-schema.md
   - Query cookbook: cookbook.md
