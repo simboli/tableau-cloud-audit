@@ -1,5 +1,10 @@
 # tableau-cloud-audit
 
+[![CI](https://github.com/simboli/tableau-cloud-audit/actions/workflows/ci.yml/badge.svg)](https://github.com/simboli/tableau-cloud-audit/actions/workflows/ci.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![Python ≥ 3.11](https://img.shields.io/badge/python-%E2%89%A53.11-blue.svg)](pyproject.toml)
+[![Docs](https://img.shields.io/badge/docs-github%20pages-teal.svg)](https://simboli.github.io/tableau-cloud-audit/)
+
 **Your entire Tableau Cloud estate in one DuckDB file.**
 
 An open-source, client-executed collector that reads a Tableau Cloud site through its

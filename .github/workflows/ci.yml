@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Install
+        run: pip install -e ".[dev]"
+      - name: Lint (ruff)
+        run: |
+          ruff check .
+          ruff format --check .
+      - name: Type check (mypy)
+        run: mypy
+      - name: Tests (incl. the schema contract — the additive-only gate)
+        run: pytest -q
+
+  docs:
+    # Publishes the MkDocs site to GitHub Pages on every push to main.
+    # One-time repo setup: Settings -> Pages -> deploy from `gh-pages` branch.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: Install docs toolchain
+        run: pip install -e ".[docs]"
+      - name: Build and deploy
+        run: mkdocs gh-deploy --force

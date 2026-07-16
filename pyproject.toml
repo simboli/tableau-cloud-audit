@@ -36,6 +36,9 @@ dev = [
   "ruff>=0.5",
   "mypy>=1.10",
 ]
+docs = [
+  "mkdocs-material>=9.5",
+]
 
 [build-system]
 requires = ["hatchling"]

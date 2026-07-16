@@ -105,5 +105,5 @@ response of something.
 
 *Compatibility promise: the schema is additive-only — tables and columns listed
 here never disappear or change type in future versions (enforced by
-[`tests/test_schema_contract.py`](../tests/test_schema_contract.py)). New
-columns/tables may appear.*
+[`tests/test_schema_contract.py`](https://github.com/simboli/tableau-cloud-audit/blob/main/tests/test_schema_contract.py)).
+New columns/tables may appear.*

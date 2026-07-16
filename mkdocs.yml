@@ -1,0 +1,36 @@
+site_name: tableau-cloud-audit
+site_description: Your entire Tableau Cloud estate in one DuckDB file — open-source, pseudonymised by construction.
+site_url: https://simboli.github.io/tableau-cloud-audit/
+repo_url: https://github.com/simboli/tableau-cloud-audit
+repo_name: simboli/tableau-cloud-audit
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: teal
+      toggle:
+        icon: material/weather-night
+        name: Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: teal
+      toggle:
+        icon: material/weather-sunny
+        name: Light mode
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+
+nav:
+  - Home: index.md
+  - What we collect: what-we-collect.md
+  - Package file schema: package-file-schema.md
+  - API coverage: api-coverage.md
+
+markdown_extensions:
+  - admonition
+  - tables
+  - pymdownx.superfences

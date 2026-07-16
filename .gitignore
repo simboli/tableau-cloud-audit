@@ -22,3 +22,4 @@ collector.toml
 .DS_Store
 .idea/
 .vscode/
+site/

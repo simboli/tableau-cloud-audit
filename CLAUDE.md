@@ -330,10 +330,20 @@ Removals/renames/type changes fail; additions welcome but must be added to
 the contract (enforced by a third test). When schema grows: update
 GOLDEN_TABLES/GOLDEN_VIEWS in the same PR as the migration.
 
-Next milestones: OSS polish (CI GitHub Actions running the suite — the
-contract test becomes the merge gate —, SECURITY.md, what-we-collect.md),
-remaining VDS backlog sources, typed state for VDS sources, history
-accumulation for job runs.
+Done 2026-07-16: **OSS polish** — GitHub Actions CI (ruff+mypy+pytest on
+3.11/3.13; the schema contract test is now the merge gate) + `docs` job
+deploying MkDocs Material to GitHub Pages on main pushes (one-time repo
+setup needed: Settings → Pages → deploy from `gh-pages` branch).
+`SECURITY.md` (security model, secrets handling, review pointers, private
+reporting), `CONTRIBUTING.md` (the two iron rules: structural privacy +
+additive-only contract), `docs/what-we-collect.md` (field-level transparency,
+kept honest by `tests/test_docs.py` drift guards), `docs/index.md` landing,
+`mkdocs.yml`, README badges. Docs build verified with `mkdocs build --strict`.
+
+Next milestones: `automation` module (extract refresh tasks, jobs,
+subscriptions — F-05 data), remaining VDS backlog sources, typed state for
+VDS sources, history accumulation for job runs, Metadata API (big), PyPI
+release (tag v0.1.0 once CI is green on GitHub).
 
 Backlog (agreed with maintainer):
 - **Clear views / `tca peek`**: local-only readable views joining `raw` with
