@@ -7,6 +7,8 @@
 
 **Your entire Tableau Cloud estate in one DuckDB file.**
 
+![tca demo: verify, collect, peek](docs/assets/demo.gif)
+
 An open-source, client-executed collector that reads a Tableau Cloud site through its
 official APIs (REST + Admin Insights via the VizQL Data Service) and lands everything
 in a single local DuckDB file — so you can understand optimization opportunities on
@@ -111,7 +113,12 @@ recombination is impossible — not merely forbidden.
 `tca export` produces the only artifact meant to leave your machine: a plain,
 unencrypted DuckDB copy with every schema **except `identity`**, verified (no
 e-mail-shaped strings anywhere) and accompanied by a SHA-256 checksum. Open it with
-any DuckDB client to inspect exactly what would be shared, before sharing it.
+any DuckDB client to inspect exactly what would be shared, before sharing it —
+convenience views included:
+
+![querying the export with DuckDB](docs/assets/query.gif)
+
+More recipes like this in the [query cookbook](docs/cookbook.md).
 
 ## Requirements
 

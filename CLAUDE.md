@@ -369,10 +369,39 @@ Done 2026-07-16 (Phase 0 of the launch plan): **`automation` module**
 pseudonymised; sandbox has none of these, empty listings land fine; default
 modules now rest_core,content,automation,permissions,activity) and
 **CHANGELOG.md** (Keep a Changelog format, v0.1.0 dated 2026-07-16).
-Release checklist remaining: git tag v0.1.0 (maintainer), demo GIF for the
-README, PyPI publish, then repo → public per Launch_Plan.md.
+2026-07-17: tag v0.1.0 pushed by maintainer. PyPI release prepared: name
+`tableau-cloud-audit` verified free, local build + twine check + clean-venv
+install smoke-tested (migrations SQL confirmed inside the wheel),
+`.github/workflows/release.yml` publishes via **Trusted Publishing** (OIDC,
+no tokens) on GitHub Release published (or manual dispatch). Maintainer-side
+one-time setup: PyPI account with 2FA → Publishing → add pending publisher
+(project tableau-cloud-audit, owner simboli, repo tableau-cloud-audit,
+workflow release.yml, environment pypi).
+Release checklist remaining: PyPI pending-publisher setup + publish the
+GitHub Release (BLOCKED 2026-07-17: Nicola's PyPI account is temporarily
+locked — step-by-step guide for when it unlocks saved in
+`../tca-documentation/Guida_Pubblicazione_PyPI.md`), demo GIF for the
+README, then repo → public per Launch_Plan.md.
 
 Docs backlog: contributor architecture map in CONTRIBUTING.
+
+Done 2026-07-17 (evening): **demo GIFs** recorded live with vhs
+(`docs/assets/demo.tape` → demo.gif: verify → collect rest_core → peek users;
+`query.tape` → query.gif: export → duckdb query on the export showing
+'All Users' grant counts — aggregates only, no PII on screen; passphrase
+never shown because the query GIF uses the unencrypted export). Both embedded
+in the README. Side improvement shipped while recording: **`tca export` now
+recreates the identity-free convenience views** (meta.v_latest_run,
+v_event_gaps, state.v_*_current) inside the export via a direct connection
+(catalog-relative definitions — a catalog-qualified view would break on
+standalone open); clear.* views still never travel. EXPORT_SAFE_VIEWS in
+writer.py must stay in sync with migrations 002/003.
+
+Design wart found while recording the demo GIF (2026-07-17): `meta.v_latest_run`
+points to the latest `ok` run even when it ran a SUBSET of modules — the
+`state.v_*_current` / `clear.*` views then under-report (e.g. a rest_core-only
+run empties `clear.permission_rules`). Backlog: consider per-endpoint "latest
+run that collected this data" semantics, or a "latest full run" view.
 
 **GitHub setup status (2026-07-16):** Nicola has GitHub Pro; CI is pushed and
 GREEN (after fixing a rich line-wrap flake in test_cli assertions — the

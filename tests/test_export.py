@@ -39,6 +39,16 @@ def test_export_copies_everything_but_identity(tmp_path: Path) -> None:
     assert {"meta", "raw"} <= schemas
     assert con.execute("SELECT is_encrypted FROM meta.file_info").fetchone()[0] is False
     assert "mario" not in str(con.execute("SELECT * FROM raw.api_responses").fetchall())
+
+    # identity-free convenience views travel with the export…
+    views = {
+        r[0]
+        for r in con.execute("SELECT view_name FROM duckdb_views() WHERE NOT internal").fetchall()
+    }
+    assert {"v_latest_run", "v_users_current", "v_permission_rules_current"} <= views
+    con.execute("SELECT * FROM state.v_users_current")  # …and actually work
+    # …but the clear views never do
+    assert not any(v.startswith("clear") for v in views)
     con.close()
 
     # source untouched: identity still there, still encrypted

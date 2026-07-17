@@ -29,10 +29,12 @@ from tca.modules import base as modules_base
 from tca.modules.activity import ActivityModule  # noqa: F401  (registers itself)
 from tca.modules.automation import AutomationModule  # noqa: F401  (registers itself)
 from tca.modules.content import ContentModule  # noqa: F401  (registers itself)
+from tca.modules.metadata import MetadataModule  # noqa: F401  (registers itself)
 from tca.modules.permissions import PermissionsModule  # noqa: F401  (registers itself)
 from tca.modules.rest_core import RestCoreModule  # noqa: F401  (registers itself)
 from tca.normalize import normalize_run
 from tca.pseudo.scrubber import Scrubber, ScrubError
+from tca.sources.metadata import MetadataApi
 from tca.sources.rest import TableauRest
 from tca.sources.vds import VizqlDataService
 from tca.storage.writer import PackageStore, StorageError
@@ -162,6 +164,7 @@ def verify(config: Path = CONFIG_OPTION) -> None:
                 f"site LUID {client.site_luid}"
             )
             _verify_admin_insights(client)
+            _verify_metadata_api(client)
             client.signout()
         finally:
             client.close()
@@ -221,6 +224,24 @@ def _verify_admin_insights(client: RestClient) -> None:
             raise
 
 
+def _verify_metadata_api(client: RestClient) -> None:
+    """The Metadata API powers the metadata module (lineage, formulas). On
+    Tableau Cloud it is always provisioned, so a failure is a warning, not a
+    hard stop — every other module works without it."""
+    try:
+        totals = MetadataApi(client).totals()
+    except TransportError as exc:
+        console.print(
+            f"[yellow]⚠ Metadata API not reachable ({exc}). "
+            "The metadata module will be skipped.[/yellow]"
+        )
+        return
+    console.print(
+        f"[green]✓[/green] Metadata API reachable — {totals['workbooks']} workbooks, "
+        f"{totals['datasources']} published data sources indexed"
+    )
+
+
 # ------------------------------------------------------------------- collect
 
 
@@ -228,7 +249,7 @@ def _verify_admin_insights(client: RestClient) -> None:
 def collect(
     config: Path = CONFIG_OPTION,
     modules: str = typer.Option(
-        "rest_core,content,automation,permissions,activity",
+        "rest_core,content,automation,permissions,activity,metadata",
         "--modules",
         "-m",
         help="Comma-separated module names.",
@@ -296,6 +317,7 @@ def collect(
                     ),
                     done=done,
                     vds=VizqlDataService(client),
+                    metadata=MetadataApi(client),
                 )
                 all_stats: dict[str, int] = {}
                 skipped = 0

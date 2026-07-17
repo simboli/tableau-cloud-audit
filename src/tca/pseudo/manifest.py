@@ -18,6 +18,11 @@ answers "what counts as personal data, per API endpoint". The scrubber
 Path syntax: dot-separated keys into the JSON payload; a ``[*]`` suffix means
 "each element of this array". Example: ``users.user[*]`` are the user objects
 in a ``GET /users`` response page.
+
+Three request surfaces, three sections below: REST endpoints (``MANIFEST``),
+VizQL Data Service sources (``VDS_MANIFEST``) and Metadata API GraphQL
+queries (``GRAPHQL_MANIFEST``). The latter two practice minimization first:
+what is not in their specs is never even requested.
 """
 
 from dataclasses import dataclass, field
@@ -267,5 +272,116 @@ VDS_MANIFEST: dict[str, VdsSourceSpec] = {
             "Controlling Permissions Project LUID",
             "Tags",
         ),
+    ),
+}
+
+
+# ============================================================================
+# Metadata API (GraphQL) — lineage, field usage, calculated-field formulas
+# ============================================================================
+#
+# Same primary mechanism as VDS: MINIMIZATION at query time. The query texts
+# below are the complete, exhaustive request surface of the metadata module —
+# nothing else is ever asked of the Metadata API — and they request NO user
+# identity fields at all: owners are already collected (pseudonymised) by the
+# REST endpoints, so the GraphQL queries simply never mention them.
+#
+# Calculated-field FORMULAS are collected deliberately (duplicate-metric
+# detection needs them) and are treated as content, not personal data — same
+# policy as workbook and project names (maintainer's decision, 2026-07-17).
+#
+# ``user_paths`` is the safety valve for the day a query needs a user object:
+# the scrubber pseudonymises GraphQL user shapes (luid/username/name/email)
+# through the same vault as REST user objects. Today every list is empty by
+# construction.
+
+# Attributes of a Metadata API user object (GraphQL shape differs from REST:
+# 'luid' not 'id', 'username' not 'name', 'name' is the display name).
+GRAPHQL_USER_IDENTITY_FIELDS: tuple[str, ...] = ("luid", "username", "name", "email")
+
+
+@dataclass(frozen=True)
+class GraphqlQuerySpec:
+    """One versioned Metadata API query and how to scrub its result."""
+
+    connection: str  # root connection field, e.g. 'workbooksConnection'
+    query: str  # the COMPLETE query text — the whole request surface
+    user_paths: list[str] = field(default_factory=list)
+
+
+# Shared field selection: typed field attributes, plus the formula on
+# calculated fields. Field 'id' is the Metadata API's internal node id (not a
+# LUID, carries no identity) — it is the join key between a sheet's
+# datasourceFields and the datasource's own field list.
+_FIELD_SELECTION = """
+        id
+        name
+        isHidden
+        __typename
+        ... on CalculatedField { formula role dataType }
+        ... on ColumnField { role dataType }
+"""
+
+GRAPHQL_MANIFEST: dict[str, GraphqlQuerySpec] = {
+    "graphql:datasources": GraphqlQuerySpec(
+        connection="publishedDatasourcesConnection",
+        query=f"""
+query tca_datasources($first: Int, $after: String) {{
+  publishedDatasourcesConnection(first: $first, after: $after) {{
+    totalCount
+    pageInfo {{ hasNextPage endCursor }}
+    nodes {{
+      id
+      luid
+      name
+      projectName
+      hasExtracts
+      extractLastRefreshTime
+      isCertified
+      containsUnsupportedCustomSql
+      fields {{{_FIELD_SELECTION}      }}
+      upstreamTables {{
+        id name schema fullName isEmbedded
+        database {{ id name connectionType }}
+      }}
+    }}
+  }}
+}}
+""",
+    ),
+    "graphql:workbooks": GraphqlQuerySpec(
+        connection="workbooksConnection",
+        query=f"""
+query tca_workbooks($first: Int, $after: String) {{
+  workbooksConnection(first: $first, after: $after) {{
+    totalCount
+    pageInfo {{ hasNextPage endCursor }}
+    nodes {{
+      id
+      luid
+      name
+      projectName
+      containsUnsupportedCustomSql
+      upstreamDatasources {{ id luid name }}
+      embeddedDatasources {{
+        id
+        name
+        fields {{{_FIELD_SELECTION}        }}
+        upstreamTables {{
+          id name schema fullName isEmbedded
+          database {{ id name connectionType }}
+        }}
+      }}
+      sheets {{
+        id
+        name
+        worksheetFields {{ id name }}
+        datasourceFields {{ id name __typename }}
+      }}
+      dashboards {{ id name path sheets {{ id }} }}
+    }}
+  }}
+}}
+""",
     ),
 }

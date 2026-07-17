@@ -18,7 +18,14 @@ import re
 from collections.abc import Iterator
 from typing import Any
 
-from tca.pseudo.manifest import MANIFEST, USER_IDENTITY_FIELDS, VDS_MANIFEST, VdsSourceSpec
+from tca.pseudo.manifest import (
+    GRAPHQL_MANIFEST,
+    GRAPHQL_USER_IDENTITY_FIELDS,
+    MANIFEST,
+    USER_IDENTITY_FIELDS,
+    VDS_MANIFEST,
+    VdsSourceSpec,
+)
 from tca.storage.writer import PackageStore
 
 _EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
@@ -39,6 +46,8 @@ class Scrubber:
         """Return a pseudonymised deep copy of ``payload``, or raise ScrubError."""
         if endpoint.startswith("vds:"):
             return self._scrub_vds(endpoint, payload)
+        if endpoint.startswith("graphql:"):
+            return self._scrub_graphql(endpoint, payload)
         spec = MANIFEST.get(endpoint)
         if spec is None:
             raise ScrubError(
@@ -92,6 +101,23 @@ class Scrubber:
         self._safety_net(endpoint, sanitized)
         return sanitized
 
+    def _scrub_graphql(self, endpoint: str, payload: dict[str, Any]) -> dict[str, Any]:
+        """Metadata API results. The queries request no identity fields by
+        construction (minimization — see the manifest), so this is mostly the
+        safety net; ``user_paths`` handles GraphQL user shapes if ever used."""
+        spec = GRAPHQL_MANIFEST.get(endpoint)
+        if spec is None:
+            raise ScrubError(
+                f"GraphQL query '{endpoint}' is not registered in the PII manifest "
+                "(tca/pseudo/manifest.py). Refusing to write its payload."
+            )
+        sanitized = copy.deepcopy(payload)
+        for path in spec.user_paths:
+            for user_obj in _iter_objects(sanitized, path):
+                self._pseudonymise_graphql(user_obj, endpoint=endpoint, path=path)
+        self._safety_net(endpoint, sanitized)
+        return sanitized
+
     # -- internals -------------------------------------------------------------
 
     def _pseudonymise(self, user_obj: dict[str, Any], endpoint: str, path: str) -> None:
@@ -110,6 +136,27 @@ class Scrubber:
             external_auth_user_id=_get_str(user_obj, "externalAuthUserId"),
         )
         for attr in USER_IDENTITY_FIELDS:
+            if attr in user_obj:
+                user_obj[attr] = pseudonym
+
+    def _pseudonymise_graphql(self, user_obj: dict[str, Any], endpoint: str, path: str) -> None:
+        """GraphQL user objects carry the same identities under different
+        names: 'luid' (not 'id'), 'username' (not 'name'), 'name' (display
+        name). Same vault, same pseudonyms as the REST shape."""
+        luid = user_obj.get("luid")
+        if not isinstance(luid, str) or not luid:
+            raise ScrubError(
+                f"User object at '{path}' in '{endpoint}' has no 'luid' — "
+                "cannot pseudonymise, refusing to write."
+            )
+        pseudonym = self._store.upsert_identity(
+            self._run_id,
+            user_luid=luid,
+            name=_get_str(user_obj, "username"),
+            full_name=_get_str(user_obj, "name"),
+            email=_get_str(user_obj, "email"),
+        )
+        for attr in GRAPHQL_USER_IDENTITY_FIELDS:
             if attr in user_obj:
                 user_obj[attr] = pseudonym
 

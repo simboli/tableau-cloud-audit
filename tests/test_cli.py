@@ -102,10 +102,20 @@ def test_verify_happy_path(workdir: Path, httpx_mock: HTTPXMock) -> None:
         url=f"{API}/datasources?pageSize=1000&pageNumber=1",
         json={"datasources": {"datasource": []}},
     )
+    httpx_mock.add_response(
+        url=f"{BASE}/api/metadata/graphql",
+        json={
+            "data": {
+                "workbooksConnection": {"totalCount": 24},
+                "publishedDatasourcesConnection": {"totalCount": 10},
+            }
+        },
+    )
     result = runner.invoke(app, ["verify"])
     assert result.exit_code == 0, result.output
     assert "All checks passed" in plain(result.output)
     assert "Admin Insights datasources not found" in plain(result.output)
+    assert "Metadata API reachable" in plain(result.output)
     assert SITE_LUID in result.output
 
 

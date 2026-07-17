@@ -408,6 +408,45 @@ class PackageStore:
 
     # -- redacted export -----------------------------------------------------------
 
+    # Convenience views recreated inside the export (views are not tables, so
+    # the table copy alone would drop them). ONLY views that touch no identity
+    # data belong here — the clear.* views must never appear. Keep definitions
+    # in sync with the migrations (002/003).
+    EXPORT_SAFE_VIEWS: tuple[tuple[str, str], ...] = (
+        (
+            "meta.v_latest_run",
+            "SELECT max(run_id) AS run_id FROM meta.collection_runs WHERE status = 'ok'",
+        ),
+        (
+            "meta.v_event_gaps",
+            """
+            WITH w AS (
+              SELECT source, window_start, window_end,
+                     lag(window_end) OVER (PARTITION BY source ORDER BY window_start) AS prev_end
+              FROM meta.event_coverage)
+            SELECT source, prev_end AS gap_start, window_start AS gap_end,
+                   date_diff('day', prev_end, window_start) AS gap_days
+            FROM w WHERE prev_end IS NOT NULL AND window_start > prev_end
+            """,
+        ),
+        (
+            "state.v_users_current",
+            "SELECT u.* FROM state.users u JOIN meta.v_latest_run r USING (run_id)",
+        ),
+        (
+            "state.v_groups_current",
+            "SELECT g.* FROM state.groups g JOIN meta.v_latest_run r USING (run_id)",
+        ),
+        (
+            "state.v_content_current",
+            "SELECT c.* FROM state.content_items c JOIN meta.v_latest_run r USING (run_id)",
+        ),
+        (
+            "state.v_permission_rules_current",
+            "SELECT p.* FROM state.permission_rules p JOIN meta.v_latest_run r USING (run_id)",
+        ),
+    )
+
     def export_redacted(self, dest: Path) -> dict[str, int]:
         """Copy every schema EXCEPT ``identity`` into a new, unencrypted file.
 
@@ -463,6 +502,15 @@ class PackageStore:
             dest.unlink(missing_ok=True)
             raise
         self.con.execute("DETACH exp")
+        # Recreate the identity-free convenience views with a direct connection
+        # to the export, so their definitions bind inside the export's own
+        # catalog (a catalog-qualified definition would break on standalone open).
+        export_con = duckdb.connect(str(dest))
+        try:
+            for view_name, view_sql in self.EXPORT_SAFE_VIEWS:
+                export_con.execute(f"CREATE OR REPLACE VIEW {view_name} AS {view_sql}")
+        finally:
+            export_con.close()
         return counts
 
     # -- summary -----------------------------------------------------------------
