@@ -37,7 +37,8 @@ config file.
 Pre-flight check, no data collected: config loads → `TCA_PAT_SECRET` set →
 sign-in works (prints REST API version and site LUID) → Admin Insights
 present and VizQL Data Service reachable (warns if not: the activity module
-would be skipped) → package file opens.
+would be skipped) → Metadata API reachable (warns if not: the metadata
+module would be skipped) → package file opens.
 
 Run it at kick-off and after any config change.
 
@@ -49,7 +50,7 @@ interrupted run loses nothing.
 
 | Option | Effect |
 |---|---|
-| `--modules/-m LIST` | Comma-separated module list. Default: `rest_core,content,automation,permissions,activity` |
+| `--modules/-m LIST` | Comma-separated module list. Default: `rest_core,content,automation,permissions,activity,metadata` |
 | `--resume` | Continue the most recent interrupted run instead of starting a new one |
 
 Modules:
@@ -61,6 +62,7 @@ Modules:
 | `automation` | extract refresh tasks, background job history, subscriptions |
 | `permissions` | project rules, default templates, per-item workbook/datasource rules |
 | `activity` | Admin Insights via VDS: TS Events (also accumulated into `history.events`), TS Users, Site Content, Tokens, Job Performance |
+| `metadata` | Metadata API (GraphQL): field-level lineage, calculated fields with formulas, sheet-level field usage, upstream tables/databases |
 
 Behavior worth knowing: runs are recorded with a status (`ok` complete ·
 `partial` interrupted, resumable · `aborted` superseded by a newer run);

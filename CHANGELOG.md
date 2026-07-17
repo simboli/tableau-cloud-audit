@@ -10,6 +10,19 @@ test). Schema versions are tracked independently in `meta.schema_migrations`.
 
 ## [Unreleased]
 
+### Added
+
+- **`metadata` collection module** — the Tableau Metadata API (GraphQL):
+  published datasources and workbooks with field-level detail — calculated
+  fields **including formulas** (collected deliberately: the duplicate-metric
+  raw material), sheet/dashboard field usage, embedded vs published
+  datasources, upstream tables and databases (lineage). Two fixed, versioned
+  queries in the PII manifest are the complete request surface; they ask for
+  **no user identity fields** (owners come from REST, already pseudonymised).
+  Cursor pagination with resume: an interrupted run continues from the cursor
+  stored in the last landed page. Part of the default module set.
+- `tca verify` now probes the Metadata API and warns if unreachable.
+
 ## [0.1.0] — 2026-07-16
 
 First public release.

@@ -100,9 +100,15 @@ Fallback chain (same package schema regardless of path): VDS → Hyper extract d
 
 ## Metadata API (GraphQL)
 
+The two query texts are versioned in the PII manifest
+([`src/tca/pseudo/manifest.py`](https://github.com/simboli/tableau-cloud-audit/blob/main/src/tca/pseudo/manifest.py),
+`GRAPHQL_MANIFEST`) — they are the complete request surface, and they ask for
+no user identity fields at all (owners come from REST, already pseudonymised).
+Cursor pagination, 20 nodes per page; `tca verify` probes the endpoint with a
+`totalCount`-only query at kick-off.
+
 | Query area | Endpoint | Purpose | PII | Status |
 |---|---|---|---|---|
-| Workbooks → sheets → fields | `POST /api/metadata/graphql` | Field usage per dashboard (duplicate detection input) | — | 📋 planned |
-| Calculated fields + formulas | same | Formula extraction (normalisation/hash is mechanical, stays collector-side) | — | 📋 planned |
-| Lineage (db → table → ds → wb) | same | Downstream counts, blast radius input | — | 📋 planned |
-| Data quality warnings & labels | same | Existing governance signals | — | 💤 backlog |
+| `graphql:datasources` — published datasources → fields (incl. calculated-field formulas) → upstream tables/databases | `POST /api/metadata/graphql` | Duplicate-metric input; lineage (blast radius) | minimized — no user fields requested | ✅ implemented (`metadata` module) |
+| `graphql:workbooks` — workbooks → sheets/dashboards → fields used; embedded datasources (fields, formulas, upstream tables); upstream published datasources | same | Field usage per sheet (duplicate detection); embedded-vs-published governance signal; lineage | minimized — no user fields requested | ✅ implemented (`metadata` module) |
+| Data quality warnings & labels | same | Existing governance signals (needs Data Management) | — | 💤 backlog |

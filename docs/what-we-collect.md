@@ -71,6 +71,28 @@ size, Subscriber ID (numeric), Owner Email → U-#### via vault lookup.
 Never requested: `Error Message`, `Subscriber Email`, `Subscription Subject`,
 Bridge fields.
 
+## Metadata API (GraphQL)
+
+Two fixed queries — versioned in the manifest, nothing else is ever asked —
+walk the content graph with cursor pagination. Neither query requests any
+user identity field: owners are collected (and pseudonymised) via REST only,
+so these payloads contain no personal data by construction.
+
+**graphql:datasources** (published datasources): name, project name, extract
+and certification flags, the field list with types, and upstream
+tables/databases (name, schema, connection type).
+
+**graphql:workbooks** (workbooks): name, project name, sheets and dashboards
+with the fields each one uses, embedded datasources (fields and upstream
+tables), and references to upstream published datasources.
+
+**Calculated-field formulas are collected** — they are the raw material for
+duplicate-metric detection ("four definitions of Net Revenue"). Formulas are
+treated as content, same policy as workbook and project names: they are
+stored verbatim and included in the export. If your formulas embed something
+sensitive, review them before sharing an export — the safety net still blocks
+anything e-mail-shaped.
+
 ## The safety net
 
 After scrubbing, and again at export time, a blocking check rejects any

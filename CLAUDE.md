@@ -346,10 +346,28 @@ nav. Also: commit history dates rewritten at maintainer's request
 (work-hours commits moved to evenings via filter-branch; backup branch
 `backup-original-dates` until he confirms the force-push).
 
-Next milestones: `automation` module (extract refresh tasks, jobs,
-subscriptions — F-05 data), remaining VDS backlog sources, typed state for
-VDS sources, history accumulation for job runs, Metadata API (big), PyPI
+Next milestones: remaining VDS backlog sources, typed state for
+VDS sources, history accumulation for job runs, PyPI
 release (tag v0.1.0 once CI is green on GitHub).
+
+Done 2026-07-18: **`metadata` module — Metadata API (GraphQL)** (F-06/F-07
+data). Two fixed queries in `GRAPHQL_MANIFEST` (manifest.py): published
+datasources (fields incl. calculated-field formulas, upstream tables/dbs)
+and workbooks (sheets/dashboards field usage, embedded datasources,
+upstream published datasources). Decisions: formulas are content, collected
+and exported in clear, no opt-out (maintainer, 2026-07-17); queries request
+NO owner/user fields at all — query-time minimization, owners come from
+REST (GraphQL user shape luid/username/name/email is still supported by the
+scrubber via `user_paths` should a future query need it). Cursor pagination
+(20 nodes/page, complexity-limit safe); resume reads the endCursor back
+from the last landed raw page — no cursor state stored anywhere else.
+GraphQL errors (often HTTP 200 + `errors` array; transport 400s carry a
+non-REST body shape) fail the page loudly; 403/404 on the endpoint = module
+skipped, never fatal. `tca verify` probes the endpoint with a
+totalCount-only query. `metadata` is in the default module set. Verified
+live on the sandbox: 1354 formulas, 49 upstream tables, 552 sheets landed;
+zero e-mail strings / known user LUIDs in the graphql pages. Typed state
+for metadata pages stays deferred (raw-first, per decision 2).
 
 Done 2026-07-16 (later still): `docs/cookbook.md` — 7 starter recipes, every
 query validated against the live sandbox file before publishing; teaser depth
