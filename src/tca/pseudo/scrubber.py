@@ -78,16 +78,20 @@ class Scrubber:
                 raise ScrubError(f"VDS row in '{endpoint}' is not an object.")
             if spec.luid_column is not None:
                 luid = row.get(spec.luid_column)
-                if not isinstance(luid, str) or not luid:
-                    raise ScrubError(
-                        f"VDS row in '{endpoint}' has no '{spec.luid_column}' — "
-                        "cannot pseudonymise, refusing to write."
-                    )
                 attrs = {
                     attr: value
                     for attr, column in spec.identity_attr_columns.items()
                     if isinstance(value := row.get(column), str) and value
                 }
+                if luid is None and not attrs:
+                    # all-null placeholder row (an empty extract returns one) —
+                    # nothing to pseudonymise, nothing that can identify
+                    continue
+                if not isinstance(luid, str) or not luid:
+                    raise ScrubError(
+                        f"VDS row in '{endpoint}' has no '{spec.luid_column}' — "
+                        "cannot pseudonymise, refusing to write."
+                    )
                 pseudonym = self._store.upsert_identity(self._run_id, user_luid=luid, **attrs)
                 row[spec.luid_column] = pseudonym
                 for column in spec.identity_attr_columns.values():

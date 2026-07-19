@@ -244,6 +244,97 @@ VDS_MANIFEST: dict[str, VdsSourceSpec] = {
         ),
         email_columns=("Owner Email",),
     ),
+    "vds:groups": VdsSourceSpec(
+        datasource_name="Groups",
+        # NOTE: 'User Email' is deliberately NOT requested (the pseudonymised
+        # LUID is the only user reference we need — attributes are already in
+        # the vault via /users and TS Users); 'Site LUID'/'Site Name'
+        # (constant) and the aggregate count fields are skipped too.
+        fields=(
+            "Group LUID",
+            "Group Name",
+            "Group Minimum Site Role",
+            "Group Is Licensed On Site",
+            "User LUID",
+        ),
+        luid_column="User LUID",
+    ),
+    "vds:permissions": VdsSourceSpec(
+        datasource_name="Permissions",
+        # Tableau's own user × item × capability flattening — collected as
+        # cross-validation data (the collector evaluates nothing).
+        # NOTE: 'User Email' and 'Grantee Name' (mixed user e-mails / group
+        # names) are deliberately NOT requested; 'Grantee LUID'/'Grantee Type'
+        # are skipped as well — a user grantee's LUID would carry identity,
+        # and rule grantees are already collected (pseudonymised) by the REST
+        # permissions module.
+        fields=(
+            "Item LUID",
+            "Item Name",
+            "Item Type",
+            "Item Parent Project Name",
+            "Top Parent Project Name",
+            "Controlling Permissions Project Name",
+            "Capability Type",
+            "Permission Value",
+            "Permissions Description",
+            "Has Permission?",
+            "User LUID",
+            "User Site Role",
+        ),
+        luid_column="User LUID",
+    ),
+    "vds:subscriptions": VdsSourceSpec(
+        datasource_name="Subscriptions",
+        # Delivery-health complement to REST /subscriptions (which already
+        # collects subscriber and subject, pseudonymised).
+        # NOTE: 'Subscriber Email'/'Subscriber User LUID', 'Created By User
+        # Email'/'Created By User LUID', 'Item Owner Email', the free-text
+        # 'Subject' and the metric-follower 'Subscriber Group *' fields are
+        # deliberately NOT requested.
+        fields=(
+            "Subscription LUID",
+            "Subscription ID",
+            "Subscription Status",
+            "Data Conditions",
+            "Has Image Attached",
+            "Has PDF Attached",
+            "Is Extract Refresh Triggered",
+            "Item LUID",
+            "Item Type",
+            "Item Name",
+            "Schedule LUID",
+            "Schedule Name",
+            "Schedule Type",
+            "Created At",
+            "Last Sent",
+            "Task LUID",
+            "Task Type",
+            "Consecutive Failure Count",
+            "Historical Queue Time",
+            "Historical Run Time",
+        ),
+    ),
+    "vds:viz_load_times": VdsSourceSpec(
+        datasource_name="Viz Load Times",
+        # NOTE: 'Item Owner Email', 'Project Owner User Name' and 'Workbook
+        # Owner User Name' (e-mails), 'HTTP User Agent' (device fingerprint)
+        # and 'HTTP Request URI' (may embed personal filter values) are
+        # deliberately NOT requested. Upstream caption is 'Item Luid' (sic).
+        fields=(
+            "Request ID",
+            "Request Time",
+            "Duration",
+            "Status Code",
+            "Status Code Type",
+            "Item Luid",
+            "Item Type",
+            "Item Name",
+            "Item Repository URL",
+            "Project Name",
+            "Workbook Name",
+        ),
+    ),
     "vds:site_content": VdsSourceSpec(
         datasource_name="Site Content",
         # NOTE: 'Owner Email', 'Item Parent Project Owner Email' and the

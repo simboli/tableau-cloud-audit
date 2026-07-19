@@ -89,12 +89,12 @@ releases. `tca verify` uses the same call to check VDS access at kick-off.
 | TS Events | `POST /api/v1/vizql-data-service/query-datasource` | Event log: sign-ins, views, publishes (90/365d window); rows also accumulate into `history.events` (dedup on Event Id — outlives retention) | minimized — identity columns (`Actor User Name`, `Item Owner Email`) never requested; numeric ids kept as join keys | ✅ implemented (`activity` module) |
 | TS Users | same | Last login beyond 90d, license role, activity aggregates | **yes** — `User LUID`/`User Name`/`User Email`/`User Friendly Name` → U-#### via vault | ✅ implemented (`activity` module) |
 | Site Content | same | Last Accessed At — the zombie-detection backbone | minimized — `Owner Email`, `Item Parent Project Owner Email`, `Description` never requested | ✅ implemented (`activity` module) |
-| Groups | same | Cross-check vs REST | **yes** | 💤 backlog |
-| Permissions | same | Cross-validation of permission data | **yes** | 💤 backlog |
-| Subscriptions | same | — | **yes** | 💤 backlog |
+| Groups | same | Membership cross-check vs REST | **yes** — `User LUID` → U-####; `User Email` never requested | ✅ implemented (`activity` module) |
+| Permissions | same | Cross-validation of permission data (Tableau's own user × item × capability rows) | **yes** — `User LUID` → U-####; `User Email`/`Grantee Name`/`Grantee LUID` never requested | ✅ implemented (`activity` module) |
+| Subscriptions | same | Delivery health: status, last sent, consecutive failures | minimized — subscriber/creator/owner identity fields and free-text `Subject` never requested (REST already collects them) | ✅ implemented (`activity` module) |
 | Tokens | same | PAT hygiene: stale tokens, leaver-owned tokens | **yes** — `Owner Email` → U-#### via reverse vault lookup (unknown → `[redacted]`); `Database User Name`/`Device Name` never requested | ✅ implemented (`activity` module) |
 | Job Performance | same | Refresh failure rates, durations, queue delay | **yes** — `Owner Email` → U-#### via reverse lookup; `Error Message`/`Subscriber Email`/Bridge fields never requested | ✅ implemented (`activity` module) |
-| Viz Load Times | same | Context only | — | 💤 backlog |
+| Viz Load Times | same | View/datasource load durations and failures | minimized — owner e-mails, `HTTP User Agent` and `HTTP Request URI` never requested | ✅ implemented (`activity` module) |
 
 Fallback chain (same package schema regardless of path): VDS → Hyper extract download → guided CSV import. Status: 💤 backlog.
 

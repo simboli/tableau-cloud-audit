@@ -220,7 +220,40 @@ def test_unregistered_vds_source_is_refused(connected) -> None:
     client, store = connected
     ctx = make_ctx(client, store)
     with pytest.raises(ScrubError, match="not registered"):
-        ctx.scrubber.scrub("vds:viz_load_times", {"data": []})
+        ctx.scrubber.scrub("vds:flows", {"data": []})
+
+
+def test_vds_groups_membership_is_pseudonymised(connected) -> None:
+    client, store = connected
+    ctx = make_ctx(client, store)
+    clean = ctx.scrubber.scrub(
+        "vds:groups",
+        {
+            "data": [
+                {
+                    "Group LUID": "g-1",
+                    "Group Name": "Finance",
+                    "Group Minimum Site Role": "Viewer",
+                    "User LUID": "aaaa-1111-2222-3333",
+                }
+            ]
+        },
+    )
+    row = clean["data"][0]
+    assert row["User LUID"] == "U-0001"
+    assert row["Group Name"] == "Finance"  # group names stay clear by design
+
+
+def test_vds_all_null_placeholder_row_is_tolerated(connected) -> None:
+    """An empty extract returns one all-null row — it must pass through,
+    not brick the run with a ScrubError (observed live on the sandbox)."""
+    client, store = connected
+    ctx = make_ctx(client, store)
+    clean = ctx.scrubber.scrub(
+        "vds:permissions",
+        {"data": [{"Item LUID": None, "User LUID": None, "Capability Type": None}]},
+    )
+    assert clean["data"] == [{"Item LUID": None, "User LUID": None, "Capability Type": None}]
 
 
 def test_vds_safety_net_blocks_leaked_email(connected) -> None:

@@ -71,6 +71,32 @@ size, Subscriber ID (numeric), Owner Email → U-#### via vault lookup.
 Never requested: `Error Message`, `Subscriber Email`, `Subscription Subject`,
 Bridge fields.
 
+**vds:groups** (Groups): Group LUID/Name/Minimum Site Role, licensed-on-sign-in
+flag, User LUID → U-#### (the membership edge, cross-checking REST).
+Never requested: `User Email`, site fields, aggregate counts.
+
+**vds:permissions** (Permissions): Tableau's own user × item × capability
+rows — item LUID/name/type, project names, Capability Type, Permission Value
+and description, Has Permission?, User Site Role, User LUID → U-####.
+Never requested: `User Email`, `Grantee Name` (mixes user e-mails with group
+names), `Grantee LUID`/`Grantee Type` (rule grantees already come from REST,
+pseudonymised).
+
+**vds:subscriptions** (Subscriptions): subscription LUID/id/status, data
+conditions, attachment flags, target item LUID/type/name, schedule
+LUID/name/type, created/last-sent dates, task LUID/type, consecutive failure
+count, queue/run durations.
+Never requested: `Subscriber Email`, `Subscriber User LUID`, `Created By User
+Email`, `Created By User LUID`, `Item Owner Email`, `Subject` (free text —
+REST `/subscriptions` already collects it), `Subscriber Group *` fields.
+
+**vds:viz_load_times** (Viz Load Times): Request ID/Time, Duration, status
+code and type, Item Luid/Type/Name, Item Repository URL, project and workbook
+names.
+Never requested: `Item Owner Email`, `Project Owner User Name`, `Workbook
+Owner User Name`, `HTTP User Agent` (device fingerprint), `HTTP Request URI`
+(may embed personal filter values).
+
 ## Metadata API (GraphQL)
 
 Two fixed queries — versioned in the manifest, nothing else is ever asked —
