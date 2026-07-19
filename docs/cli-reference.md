@@ -61,7 +61,7 @@ Modules:
 | `content` | projects, workbooks, views, datasources, per-item connections |
 | `automation` | extract refresh tasks, background job history, subscriptions |
 | `permissions` | project rules, default templates, per-item workbook/datasource rules |
-| `activity` | Admin Insights via VDS: TS Events (also accumulated into `history.events`), TS Users, Site Content, Tokens, Job Performance |
+| `activity` | Admin Insights via VDS: TS Events (also accumulated into `history.events`), TS Users, Site Content, Tokens, Job Performance (also accumulated into `history.job_runs`), Groups, Permissions, Subscriptions, Viz Load Times |
 | `metadata` | Metadata API (GraphQL): field-level lineage, calculated fields with formulas, sheet-level field usage, upstream tables/databases |
 
 Behavior worth knowing: runs are recorded with a status (`ok` complete ·
@@ -73,9 +73,9 @@ and says so.
 ## `tca summary`
 
 What the file contains: site identity, schema version, encryption flag, run
-count, response pages, identity-vault size, event-history window and
-**coverage gaps** (warns when runs were further apart than the retention
-window).
+count, response pages, identity-vault size, event- and job-run-history
+counts, the event-history window and **coverage gaps** (warns when runs were
+further apart than the retention window).
 
 ## `tca peek VIEW`
 

@@ -26,7 +26,10 @@ theme:
 
 nav:
   - Home: index.md
+  - Getting started: getting-started.md
   - Getting ready: getting-ready.md
+  - Operations runbook: runbook.md
+  - CLI cheatsheet: cli-cheatsheet.md
   - CLI reference: cli-reference.md
   - What we collect: what-we-collect.md
   - Package file schema: package-file-schema.md
