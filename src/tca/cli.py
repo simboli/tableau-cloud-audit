@@ -571,7 +571,7 @@ def peek(
             "[yellow]⚠ REAL identities below — resolved locally from the identity "
             "vault. This is exactly what `tca export` can NOT reproduce.[/yellow]"
         )
-        table = Table(title=f"{PEEK_VIEWS[view]} (latest ok run, max {limit} rows)")
+        table = Table(title=f"{PEEK_VIEWS[view]} (latest collected snapshot, max {limit} rows)")
         for column in columns:
             table.add_column(column)
         for row in rows:

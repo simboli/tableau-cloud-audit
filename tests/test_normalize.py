@@ -428,16 +428,36 @@ def test_normalize_is_idempotent(store: PackageStore) -> None:
     assert count == 2
 
 
-def test_current_views_follow_latest_ok_run(store: PackageStore) -> None:
-    run1 = store.begin_run(modules=["rest_core"])
+def test_current_views_follow_latest_run_that_collected_the_data(store: PackageStore) -> None:
+    """The partial-run wart (fixed in 007): a run collecting a SUBSET of the
+    endpoints must refresh only the views of what it collected — everything
+    else keeps pointing at the last run that actually collected it."""
+    run1 = store.begin_run(modules=["rest_core", "content", "permissions"])
     seed_raw(store, run1)
     normalize_run(store, run1)
     store.finish_run(run1, "ok")
 
+    # a users-only partial run
     run2 = store.begin_run(modules=["rest_core"])
     store.write_response(run2, "/users", {"users": {"user": [{"id": "U-0003"}]}})
     normalize_run(store, run2)
     store.finish_run(run2, "ok")
 
     current = store.con.execute("SELECT user_pseudo FROM state.v_users_current").fetchall()
-    assert current == [("U-0003",)]  # only the latest ok run
+    assert current == [("U-0003",)]  # users follow run2
+
+    # groups, content and permission rules were NOT collected by run2:
+    # their views still show run1 instead of going empty
+    groups = store.con.execute("SELECT run_id, name FROM state.v_groups_current").fetchall()
+    assert groups == [(run1, "Finance")]
+    content = store.con.execute("SELECT DISTINCT run_id FROM state.v_content_current").fetchall()
+    assert content == [(run1,)]
+    rules = store.con.execute("SELECT count(*) FROM state.v_permission_rules_current").fetchone()
+    assert rules == (3,)
+
+    # an empty listing still counts as collected: no stale ghosts
+    run3 = store.begin_run(modules=["rest_core"])
+    store.write_response(run3, "/users", {"users": {}})
+    normalize_run(store, run3)
+    store.finish_run(run3, "ok")
+    assert store.con.execute("SELECT count(*) FROM state.v_users_current").fetchone() == (0,)

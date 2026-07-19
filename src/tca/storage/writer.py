@@ -33,6 +33,7 @@ MIGRATIONS: tuple[tuple[str, str], ...] = (
     ("0.4", "004_clear_views.sql"),
     ("0.5", "005_job_history.sql"),
     ("0.6", "006_vds_metadata_state.sql"),
+    ("0.7", "007_current_view_semantics.sql"),
 )
 SCHEMA_VERSION = MIGRATIONS[-1][0]
 _CATALOG = "pkg"
@@ -456,11 +457,21 @@ class PackageStore:
     # Convenience views recreated inside the export (views are not tables, so
     # the table copy alone would drop them). ONLY views that touch no identity
     # data belong here — the clear.* views must never appear. Keep definitions
-    # in sync with the migrations (002/003).
+    # in sync with the migrations (002/003/007). Order matters: dependencies
+    # first.
     EXPORT_SAFE_VIEWS: tuple[tuple[str, str], ...] = (
         (
             "meta.v_latest_run",
             "SELECT max(run_id) AS run_id FROM meta.collection_runs WHERE status = 'ok'",
+        ),
+        (
+            "meta.v_endpoint_latest_run",
+            """
+            SELECT r.endpoint, max(r.run_id) AS run_id
+            FROM raw.api_responses r
+            JOIN meta.collection_runs c ON c.run_id = r.run_id AND c.status = 'ok'
+            GROUP BY r.endpoint
+            """,
         ),
         (
             "meta.v_event_gaps",
@@ -476,19 +487,28 @@ class PackageStore:
         ),
         (
             "state.v_users_current",
-            "SELECT u.* FROM state.users u JOIN meta.v_latest_run r USING (run_id)",
+            "SELECT u.* FROM state.users u WHERE u.run_id = "
+            "(SELECT run_id FROM meta.v_endpoint_latest_run WHERE endpoint = '/users')",
         ),
         (
             "state.v_groups_current",
-            "SELECT g.* FROM state.groups g JOIN meta.v_latest_run r USING (run_id)",
+            "SELECT g.* FROM state.groups g WHERE g.run_id = "
+            "(SELECT run_id FROM meta.v_endpoint_latest_run WHERE endpoint = '/groups')",
         ),
         (
             "state.v_content_current",
-            "SELECT c.* FROM state.content_items c JOIN meta.v_latest_run r USING (run_id)",
+            "SELECT c.* FROM state.content_items c WHERE c.run_id = "
+            "(SELECT max(run_id) FROM meta.v_endpoint_latest_run "
+            "WHERE endpoint IN ('/workbooks', '/datasources'))",
         ),
         (
             "state.v_permission_rules_current",
-            "SELECT p.* FROM state.permission_rules p JOIN meta.v_latest_run r USING (run_id)",
+            "SELECT p.* FROM state.permission_rules p WHERE p.run_id = "
+            "(SELECT max(run_id) FROM meta.v_endpoint_latest_run "
+            "WHERE endpoint IN ('/projects/{luid}/permissions', "
+            "'/projects/{luid}/default-permissions/workbooks', "
+            "'/projects/{luid}/default-permissions/datasources', "
+            "'/workbooks/{luid}/permissions', '/datasources/{luid}/permissions'))",
         ),
     )
 

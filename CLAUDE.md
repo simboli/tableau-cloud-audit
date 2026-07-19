@@ -441,11 +441,14 @@ v_event_gaps, state.v_*_current) inside the export via a direct connection
 standalone open); clear.* views still never travel. EXPORT_SAFE_VIEWS in
 writer.py must stay in sync with migrations 002/003.
 
-Design wart found while recording the demo GIF (2026-07-17): `meta.v_latest_run`
-points to the latest `ok` run even when it ran a SUBSET of modules — the
-`state.v_*_current` / `clear.*` views then under-report (e.g. a rest_core-only
-run empties `clear.permission_rules`). Backlog: consider per-endpoint "latest
-run that collected this data" semantics, or a "latest full run" view.
+~~Design wart found while recording the demo GIF (2026-07-17)~~ **CLOSED
+2026-07-19 by migration 007 (v0.7)**: per-endpoint semantics chosen (the
+maintainer picked it over a "latest full run" view). Each `v_*_current` now
+follows the latest ok run that actually collected its data, read from
+`meta.v_endpoint_latest_run` (built on raw.api_responses — an empty listing
+still lands a page, so genuinely-empty data stays empty, no stale ghosts).
+`meta.v_latest_run` keeps its original meaning. EXPORT_SAFE_VIEWS now must
+stay in sync with migrations 002/003/007.
 
 **GitHub setup status (2026-07-16):** Nicola has GitHub Pro; CI is pushed and
 GREEN (after fixing a rich line-wrap flake in test_cli assertions — the

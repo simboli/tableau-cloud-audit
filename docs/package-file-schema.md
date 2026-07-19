@@ -1,7 +1,7 @@
 # Package file — schema map
 
 Orientation guide to the DuckDB package file produced by **tableau-cloud-audit**
-(`tca`). Current schema version: **v0.6** (July 2026). One file per Tableau Cloud
+(`tca`). Current schema version: **v0.7** (July 2026). One file per Tableau Cloud
 site; every table carries `run_id` — full snapshot per run, never deltas.
 
 > Opening the file: it is usually **encrypted**. From a SQL client (DBeaver, duckdb
@@ -26,7 +26,8 @@ site; every table carries `run_id` — full snapshot per run, never deltas.
 | `schema_migrations` | which schema migrations (001…) were applied, when, by which collector version |
 | `event_coverage` | the event time-window each run covered |
 | `v_event_gaps` 👁 | **holes** in the event history between runs (empty = no gaps) |
-| `v_latest_run` 👁 | id of the latest `ok` run — "the current snapshot" |
+| `v_latest_run` 👁 | id of the latest `ok` run |
+| `v_endpoint_latest_run` 👁 | per endpoint, the latest `ok` run that actually collected it — what the `v_*_current` views are built on |
 
 ## `raw` — the source of truth *(pseudonymised API payloads)*
 
@@ -60,7 +61,7 @@ Rebuilt mechanically from `raw` at the end of every collect. Every table has
 | `upstream_tables` | lineage: the tables/databases each datasource reads |
 | `sheet_fields` | which fields each sheet actually uses (worksheet + datasource references) |
 | `workbook_datasources` | embedded vs published datasource usage per workbook |
-| `v_users_current`, `v_groups_current`, `v_content_current`, `v_permission_rules_current` 👁 | the same, filtered to the latest ok run |
+| `v_users_current`, `v_groups_current`, `v_content_current`, `v_permission_rules_current` 👁 | the same, each filtered to the latest `ok` run **that collected that data** — a partial run (e.g. users only) refreshes only what it collected, it never empties the other views |
 
 ## `history` — the accumulator that outlives retention
 

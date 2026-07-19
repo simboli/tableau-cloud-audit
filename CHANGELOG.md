@@ -42,6 +42,15 @@ test). Schema versions are tracked independently in `meta.schema_migrations`.
 - **Progress bars** for the per-item collect loops (connections, permissions,
   group membership) instead of one output line per page.
 
+### Fixed
+
+- **Partial runs no longer empty the `v_*_current` / `clear.*` views**
+  (schema v0.7): each view now follows the latest ok run that actually
+  collected its data (`meta.v_endpoint_latest_run`), instead of the single
+  latest ok run. A users-only refresh updates users and leaves permissions,
+  groups and content pointing at the last run that collected them; an empty
+  listing still counts as collected, so genuinely-removed data stays gone.
+
 ## [0.1.0] — 2026-07-16
 
 First public release.
