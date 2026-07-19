@@ -162,7 +162,7 @@ def seed_raw(store: PackageStore, run_id: int) -> None:
         },
         entity_luid="p-1",
     )
-    # a VDS page: must be ignored by normalize, not crash it
+    # a VDS page: typed into state.user_activity since v0.6
     store.write_response(run_id, "vds:ts_users", {"data": [{"User LUID": "U-0001"}]})
 
 
@@ -180,6 +180,7 @@ def test_normalize_builds_state_tables(store: PackageStore) -> None:
         "state.views": 1,
         "state.connections": 2,
         "state.permission_rules": 3,
+        "state.user_activity": 1,
     }
 
     user = store.con.execute(
@@ -215,6 +216,205 @@ def test_normalize_builds_state_tables(store: PackageStore) -> None:
         ("group", "g-1", "Write", "Deny", True, "workbook"),
         ("user", "U-0001", "Read", "Allow", True, "workbook"),
     ]
+
+
+def test_normalize_types_vds_pages(store: PackageStore) -> None:
+    run_id = store.begin_run(modules=["activity"])
+    store.write_response(
+        run_id,
+        "vds:ts_users",
+        {
+            "data": [
+                {
+                    "User ID": 42,
+                    "User LUID": "U-0001",
+                    "User Site Role": "Creator",
+                    "User License Type": "Creator",
+                    "User Creation Date": "2025-01-01T00:00:00",
+                    "Last Login Date": "2026-07-01T10:00:00",
+                    "Days Since Last Login": 17,
+                }
+            ]
+        },
+        entity_luid="ai-users",
+    )
+    store.write_response(
+        run_id,
+        "vds:site_content",
+        {
+            "data": [
+                # one real row + the all-null placeholder of an empty extract
+                {
+                    "Item LUID": "wb-1",
+                    "Item Type": "Workbook",
+                    "Item Name": "Sales",
+                    "Last Accessed At": "2026-06-30T08:00:00",
+                    "Size (bytes)": 1024,
+                    "Is Data Extract": "true",
+                },
+                {"Item LUID": None, "Item Name": None},
+            ]
+        },
+        entity_luid="ai-content",
+    )
+    store.write_response(
+        run_id,
+        "vds:permissions",
+        {
+            "data": [
+                {
+                    "Item LUID": "wb-1",
+                    "Item Type": "Workbook",
+                    "Capability Type": "Read",
+                    "Has Permission?": True,
+                    "User LUID": "U-0001",
+                    "User Site Role": "Viewer",
+                }
+            ]
+        },
+        entity_luid="ai-perms",
+    )
+    counts = normalize_run(store, run_id)
+    assert counts == {
+        "state.user_activity": 1,
+        "state.content_usage": 1,  # placeholder row skipped
+        "state.user_capabilities": 1,
+    }
+
+    activity = store.con.execute(
+        "SELECT user_id, user_pseudo, days_since_last_login, last_login_at FROM state.user_activity"
+    ).fetchone()
+    assert activity[:3] == (42, "U-0001", 17)
+    assert str(activity[3]).startswith("2026-07-01 10:00")
+
+    usage = store.con.execute(
+        "SELECT item_luid, size_bytes, is_data_extract, last_accessed_at FROM state.content_usage"
+    ).fetchone()
+    assert usage[:3] == ("wb-1", 1024, True)
+
+    capability = store.con.execute(
+        "SELECT item_luid, capability, has_permission, user_pseudo FROM state.user_capabilities"
+    ).fetchone()
+    assert capability == ("wb-1", "Read", True, "U-0001")
+
+
+def test_normalize_types_metadata_pages(store: PackageStore) -> None:
+    run_id = store.begin_run(modules=["metadata"])
+    store.write_response(
+        run_id,
+        "graphql:datasources",
+        {
+            "data": {
+                "publishedDatasourcesConnection": {
+                    "nodes": [
+                        {
+                            "id": "ds-node-1",
+                            "luid": "ds-1",
+                            "name": "Sales Model",
+                            "fields": [
+                                {
+                                    "id": "f-1",
+                                    "name": "Net Revenue",
+                                    "__typename": "CalculatedField",
+                                    "role": "MEASURE",
+                                    "dataType": "REAL",
+                                    "isHidden": False,
+                                    "formula": "[Gross]-[Costs]",
+                                }
+                            ],
+                            "upstreamTables": [
+                                {
+                                    "id": "t-1",
+                                    "name": "orders",
+                                    "schema": "public",
+                                    "fullName": "[public].[orders]",
+                                    "isEmbedded": False,
+                                    "database": {"name": "dwh", "connectionType": "postgres"},
+                                }
+                            ],
+                        }
+                    ]
+                }
+            }
+        },
+    )
+    store.write_response(
+        run_id,
+        "graphql:workbooks",
+        {
+            "data": {
+                "workbooksConnection": {
+                    "nodes": [
+                        {
+                            "id": "wb-node-1",
+                            "luid": "wb-1",
+                            "name": "Sales",
+                            "upstreamDatasources": [
+                                {"id": "ds-node-1", "luid": "ds-1", "name": "Sales Model"}
+                            ],
+                            "embeddedDatasources": [
+                                {
+                                    "id": "emb-1",
+                                    "name": "local extract",
+                                    "fields": [
+                                        {
+                                            "id": "f-2",
+                                            "name": "Region",
+                                            "__typename": "ColumnField",
+                                            "role": "DIMENSION",
+                                            "dataType": "STRING",
+                                        }
+                                    ],
+                                    "upstreamTables": [],
+                                }
+                            ],
+                            "sheets": [
+                                {
+                                    "id": "sh-1",
+                                    "name": "Overview",
+                                    "worksheetFields": [{"id": "wf-1", "name": "Region"}],
+                                    "datasourceFields": [{"id": "f-1", "name": "Net Revenue"}],
+                                }
+                            ],
+                        }
+                    ]
+                }
+            }
+        },
+    )
+    counts = normalize_run(store, run_id)
+    assert counts == {
+        "state.datasource_fields": 2,
+        "state.upstream_tables": 1,
+        "state.sheet_fields": 2,
+        "state.workbook_datasources": 2,
+    }
+
+    formula = store.con.execute(
+        "SELECT datasource_luid, is_embedded, formula FROM state.datasource_fields "
+        "WHERE field_node_id = 'f-1'"
+    ).fetchone()
+    assert formula == ("ds-1", False, "[Gross]-[Costs]")
+    embedded = store.con.execute(
+        "SELECT workbook_luid, is_embedded, formula FROM state.datasource_fields "
+        "WHERE field_node_id = 'f-2'"
+    ).fetchone()
+    assert embedded == ("wb-1", True, None)
+
+    table = store.con.execute(
+        "SELECT datasource_node_id, table_schema, database_type FROM state.upstream_tables"
+    ).fetchone()
+    assert table == ("ds-node-1", "public", "postgres")
+
+    kinds = store.con.execute(
+        "SELECT field_name, kind FROM state.sheet_fields ORDER BY kind DESC"
+    ).fetchall()
+    assert kinds == [("Region", "worksheet"), ("Net Revenue", "datasource")]
+
+    links = store.con.execute(
+        "SELECT datasource_name, is_embedded FROM state.workbook_datasources ORDER BY is_embedded"
+    ).fetchall()
+    assert links == [("Sales Model", False), ("local extract", True)]
 
 
 def test_normalize_is_idempotent(store: PackageStore) -> None:

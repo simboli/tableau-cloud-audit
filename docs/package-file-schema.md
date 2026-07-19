@@ -1,7 +1,7 @@
 # Package file — schema map
 
 Orientation guide to the DuckDB package file produced by **tableau-cloud-audit**
-(`tca`). Current schema version: **v0.5** (July 2026). One file per Tableau Cloud
+(`tca`). Current schema version: **v0.6** (July 2026). One file per Tableau Cloud
 site; every table carries `run_id` — full snapshot per run, never deltas.
 
 > Opening the file: it is usually **encrypted**. From a SQL client (DBeaver, duckdb
@@ -49,6 +49,17 @@ Rebuilt mechanically from `raw` at the end of every collect. Every table has
 | `views` | workbook views + all-time view counter (windowed usage lives in `history.events`) |
 | `connections` | database connections per item: type, server, embedded credentials y/n, credential-user present y/n |
 | `permission_rules` | **1 row per grantee × capability**, incl. project default templates (`is_default_template`, `template_for`) — where "All Users" grants hide |
+| `user_activity` | Admin Insights TS Users: real last login (beyond the REST field), license type, days since last login |
+| `content_usage` | Admin Insights Site Content: `last_accessed_at` (the zombie-detection backbone), publish dates, size, extract/certified flags |
+| `tokens` | PAT hygiene: type, issued/expires/last-used dates, owner pseudonym |
+| `vds_group_members` | Admin Insights Groups membership edges — cross-check vs the REST `group_members` |
+| `user_capabilities` | Admin Insights Permissions: Tableau's own user × item × capability rows (cross-validation data, not our evaluation) |
+| `subscription_health` | subscription delivery health: status, last sent, consecutive failures, queue/run durations |
+| `viz_loads` | request-level view/datasource load durations and status codes (windowed by retention) |
+| `datasource_fields` | every field of every datasource (published and embedded), **calculated-field formulas included** |
+| `upstream_tables` | lineage: the tables/databases each datasource reads |
+| `sheet_fields` | which fields each sheet actually uses (worksheet + datasource references) |
+| `workbook_datasources` | embedded vs published datasource usage per workbook |
 | `v_users_current`, `v_groups_current`, `v_content_current`, `v_permission_rules_current` 👁 | the same, filtered to the latest ok run |
 
 ## `history` — the accumulator that outlives retention

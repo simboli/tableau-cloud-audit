@@ -22,6 +22,25 @@ test). Schema versions are tracked independently in `meta.schema_migrations`.
   Cursor pagination with resume: an interrupted run continues from the cursor
   stored in the last landed page. Part of the default module set.
 - `tca verify` now probes the Metadata API and warns if unreachable.
+- **Four more Admin Insights sources** in the `activity` module — Groups
+  (membership cross-check), Permissions (Tableau's own user × item ×
+  capability rows), Subscriptions (delivery health) and Viz Load Times
+  (request-level load durations). Minimization-first as always: user e-mails,
+  mixed grantee names, HTTP user agents and request URIs are never requested;
+  user LUIDs are pseudonymised. The scrubber now tolerates the all-null
+  placeholder row an empty extract returns.
+- **Job-run history** (schema v0.5): `history.job_runs` accumulates Job
+  Performance rows across runs (deduplicated on Job ID — outlives the
+  Admin Insights retention window), with coverage windows and gap detection
+  shared with the event history. Shown in `tca summary`.
+- **Typed state for VDS and Metadata pages** (schema v0.6): `state.user_activity`,
+  `content_usage`, `tokens`, `vds_group_members`, `user_capabilities`,
+  `subscription_health`, `viz_loads` from the Admin Insights sources, and
+  `datasource_fields` (formulas included), `upstream_tables`, `sheet_fields`,
+  `workbook_datasources` from the Metadata API — all rebuilt mechanically
+  from raw on every collect, all under the additive-only schema contract.
+- **Progress bars** for the per-item collect loops (connections, permissions,
+  group membership) instead of one output line per page.
 
 ## [0.1.0] — 2026-07-16
 

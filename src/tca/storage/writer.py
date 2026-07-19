@@ -32,6 +32,7 @@ MIGRATIONS: tuple[tuple[str, str], ...] = (
     ("0.3", "003_typed_state.sql"),
     ("0.4", "004_clear_views.sql"),
     ("0.5", "005_job_history.sql"),
+    ("0.6", "006_vds_metadata_state.sql"),
 )
 SCHEMA_VERSION = MIGRATIONS[-1][0]
 _CATALOG = "pkg"

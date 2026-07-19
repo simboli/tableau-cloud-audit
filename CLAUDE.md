@@ -346,9 +346,35 @@ nav. Also: commit history dates rewritten at maintainer's request
 (work-hours commits moved to evenings via filter-branch; backup branch
 `backup-original-dates` until he confirms the force-push).
 
-Next milestones: remaining VDS backlog sources, typed state for
-VDS sources, history accumulation for job runs, PyPI
-release (tag v0.1.0 once CI is green on GitHub).
+Next milestones: PyPI release (blocked on account unlock, see below), then
+repo → public per Launch_Plan.md.
+
+Done 2026-07-19 (collector-functionality backlog, all four items):
+1. **Progress bars for per-item collect loops** — modules wrap loops in
+   `ctx.track(items, label)` (console-agnostic, default pass-through); the
+   CLI injects a rich Progress tracker and suppresses per-page lines while
+   a tracked loop is active (listing pages still print one line each).
+2. **Remaining Admin Insights sources** — vds:groups, vds:permissions,
+   vds:subscriptions, vds:viz_load_times added to the VDS manifest (field
+   captions from the official Tableau Data Dictionary; NOT yet verified
+   live — the intersection mechanism drops drifted captions safely).
+   Minimization decisions: Permissions requests NO grantee columns (a user
+   grantee's LUID would leak; grantees come from REST) and no User Email;
+   Subscriptions requests no subscriber/creator identity nor Subject;
+   Viz Load Times skips owner e-mails, HTTP User Agent and Request URI.
+   The scrubber now tolerates all-null placeholder rows (empty extract)
+   for luid_column sources instead of failing the run.
+3. **Job-run history** — migration 005 (v0.5): history.job_runs, dedup on
+   Job ID, fed by the activity module from landed Job Performance pages
+   (same read-back-from-raw resume-safe pattern as history.events);
+   coverage reuses meta.event_coverage/v_event_gaps; `tca summary` shows
+   the count.
+4. **Typed state for VDS + Metadata pages** — migration 006 (v0.6), 11 new
+   state tables: user_activity, content_usage, tokens, vds_group_members,
+   user_capabilities, subscription_health, viz_loads (declarative
+   caption→column maps in normalize.py, all-null rows skipped) and
+   datasource_fields (formulas included), upstream_tables, sheet_fields,
+   workbook_datasources (GraphQL walkers). All in the schema contract.
 
 Done 2026-07-18: **`metadata` module — Metadata API (GraphQL)** (F-06/F-07
 data). Two fixed queries in `GRAPHQL_MANIFEST` (manifest.py): published
