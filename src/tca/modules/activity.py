@@ -13,6 +13,7 @@ drift across Tableau releases.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 from tca.modules.base import ModuleStats, RunContext, register
@@ -22,6 +23,7 @@ from tca.transport.client import TransportError
 
 ADMIN_INSIGHTS_PROJECT = "Admin Insights"
 TS_EVENTS_ENDPOINT = "vds:ts_events"
+JOB_PERFORMANCE_ENDPOINT = "vds:job_performance"
 
 
 class ActivityModule:
@@ -64,12 +66,24 @@ class ActivityModule:
                 stats.count(endpoint, ctx.land(endpoint, payload, entity_luid=luid))
 
             if endpoint == TS_EVENTS_ENDPOINT:
-                self._accumulate_history(ctx, endpoint, luid)
+                self._accumulate_history(ctx, endpoint, luid, "Event Date", ctx.store.insert_events)
+            elif endpoint == JOB_PERFORMANCE_ENDPOINT:
+                self._accumulate_history(
+                    ctx, endpoint, luid, "Created At", ctx.store.insert_job_runs
+                )
 
         return stats
 
-    def _accumulate_history(self, ctx: RunContext, endpoint: str, luid: str) -> None:
-        """Fold the landed TS Events page into history.events (dedup on Event Id).
+    def _accumulate_history(
+        self,
+        ctx: RunContext,
+        endpoint: str,
+        luid: str,
+        date_caption: str,
+        insert: Callable[[int, list[dict[str, Any]]], int],
+    ) -> None:
+        """Fold the landed page into its history accumulator (dedup on the
+        natural key).
 
         Reads back the SANITIZED payload from raw — history always derives from
         what was actually stored, and this also makes resume safe: a crash
@@ -78,9 +92,14 @@ class ActivityModule:
         payload = ctx.store.get_response(ctx.run_id, endpoint, entity_luid=luid)
         if payload is None:  # page denied/never landed in this run
             return
-        rows = payload.get("data", [])
-        ctx.store.insert_events(ctx.run_id, rows)
-        dates = [d for row in rows if (d := row.get("Event Date")) is not None]
+        # an empty extract returns one all-null placeholder row: not history
+        rows = [
+            row
+            for row in payload.get("data", [])
+            if any(value is not None for value in row.values())
+        ]
+        insert(ctx.run_id, rows)
+        dates = [d for row in rows if (d := row.get(date_caption)) is not None]
         if dates:
             ctx.store.record_coverage(ctx.run_id, endpoint, min(dates), max(dates))
 

@@ -22,7 +22,7 @@ import pytest
 from tca.storage.writer import PackageStore
 
 # ---------------------------------------------------------------------------
-# Golden contract — schema v0.4 (2026-07-15)
+# Golden contract — schema v0.5 (2026-07-19)
 # ---------------------------------------------------------------------------
 
 GOLDEN_TABLES: dict[str, dict[str, str]] = {
@@ -80,6 +80,34 @@ GOLDEN_TABLES: dict[str, dict[str, str]] = {
         "actor_license_role": "VARCHAR",
         "item_owner_id": "BIGINT",
         "target_user_id": "BIGINT",
+        "first_seen_run": "INTEGER",
+    },
+    "history.job_runs": {
+        "job_id": "BIGINT",
+        "job_luid": "VARCHAR",
+        "job_type": "VARCHAR",
+        "job_result": "VARCHAR",
+        "final_job_result": "VARCHAR",
+        "was_manual_run": "BOOLEAN",
+        "item_id": "BIGINT",
+        "item_luid": "VARCHAR",
+        "item_type": "VARCHAR",
+        "item_name": "VARCHAR",
+        "parent_project_name": "VARCHAR",
+        "schedule_luid": "VARCHAR",
+        "schedule_name": "VARCHAR",
+        "created_at": "TIMESTAMP",
+        "queued_at": "TIMESTAMP",
+        "started_at": "TIMESTAMP",
+        "completed_at": "TIMESTAMP",
+        "job_duration": "DOUBLE",
+        "job_queued_duration": "DOUBLE",
+        "job_execution_duration": "DOUBLE",
+        "job_overflow_queued_duration": "DOUBLE",
+        "was_overflow_queued": "BOOLEAN",
+        "extract_file_size": "DOUBLE",
+        "subscriber_id": "BIGINT",
+        "owner_email": "VARCHAR",
         "first_seen_run": "INTEGER",
     },
     "state.users": {

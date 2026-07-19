@@ -1,7 +1,7 @@
 # Package file — schema map
 
 Orientation guide to the DuckDB package file produced by **tableau-cloud-audit**
-(`tca`). Current schema version: **v0.4** (July 2026). One file per Tableau Cloud
+(`tca`). Current schema version: **v0.5** (July 2026). One file per Tableau Cloud
 site; every table carries `run_id` — full snapshot per run, never deltas.
 
 > Opening the file: it is usually **encrypted**. From a SQL client (DBeaver, duckdb
@@ -56,6 +56,7 @@ Rebuilt mechanically from `raw` at the end of every collect. Every table has
 | Object | Contents |
 |---|---|
 | `events` | the Admin Insights event log (TS Events), **deduplicated on `event_id` and cumulative across runs**: run monthly and history grows beyond Tableau's 90-day window. `first_seen_run` records provenance; user references are numeric join keys (→ TS Users), not identities |
+| `job_runs` | background job history (Job Performance), **deduplicated on `job_id` and cumulative across runs** — results, timestamps, durations, extract size; `owner_email` holds the pseudonym, never a real address |
 
 ## `identity` — the only place personal data exists 🔐
 

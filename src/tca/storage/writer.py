@@ -31,6 +31,7 @@ MIGRATIONS: tuple[tuple[str, str], ...] = (
     ("0.2", "002_event_history.sql"),
     ("0.3", "003_typed_state.sql"),
     ("0.4", "004_clear_views.sql"),
+    ("0.5", "005_job_history.sql"),
 )
 SCHEMA_VERSION = MIGRATIONS[-1][0]
 _CATALOG = "pkg"
@@ -52,6 +53,35 @@ TS_EVENTS_COLUMNS: tuple[tuple[str, str], ...] = (
     ("Actor License Role", "actor_license_role"),
     ("Item Owner Id", "item_owner_id"),
     ("Target User Id", "target_user_id"),
+)
+
+# Job Performance caption -> history.job_runs column. Same sync rule as above.
+JOB_RUNS_COLUMNS: tuple[tuple[str, str], ...] = (
+    ("Job ID", "job_id"),
+    ("Job LUID", "job_luid"),
+    ("Job Type", "job_type"),
+    ("Job Result", "job_result"),
+    ("Final Job Result", "final_job_result"),
+    ("Was Manual Run", "was_manual_run"),
+    ("Item ID", "item_id"),
+    ("Item LUID", "item_luid"),
+    ("Item Type", "item_type"),
+    ("Item Name", "item_name"),
+    ("Parent Project Name", "parent_project_name"),
+    ("Schedule LUID", "schedule_luid"),
+    ("Schedule Name", "schedule_name"),
+    ("Created At", "created_at"),
+    ("Queued At", "queued_at"),
+    ("Started At", "started_at"),
+    ("Completed At", "completed_at"),
+    ("Job Duration", "job_duration"),
+    ("Job Queued Duration", "job_queued_duration"),
+    ("Job Execution Duration", "job_execution_duration"),
+    ("Job Overflow Queued Duration", "job_overflow_queued_duration"),
+    ("Was Overflow Queued", "was_overflow_queued"),
+    ("Extract File Size", "extract_file_size"),
+    ("Subscriber ID", "subscriber_id"),
+    ("Owner Email", "owner_email"),
 )
 
 
@@ -306,26 +336,40 @@ class PackageStore:
         Returns the number of NEW events; re-inserting known ones is a no-op,
         so this is safe to call on every run and on resume.
         """
+        return self._insert_history("history.events", TS_EVENTS_COLUMNS, "Event Id", run_id, rows)
+
+    def insert_job_runs(self, run_id: int, rows: list[dict[str, Any]]) -> int:
+        """Dedup-append Job Performance rows (INSERT OR IGNORE on job_id)."""
+        return self._insert_history("history.job_runs", JOB_RUNS_COLUMNS, "Job ID", run_id, rows)
+
+    def _insert_history(
+        self,
+        table: str,
+        columns: tuple[tuple[str, str], ...],
+        key_caption: str,
+        run_id: int,
+        rows: list[dict[str, Any]],
+    ) -> int:
         params: list[list[Any]] = []
         for row in rows:
-            if row.get("Event Id") is None:
+            if row.get(key_caption) is None:
                 raise StorageError(
-                    "A TS Events row has no 'Event Id' — cannot deduplicate. "
+                    f"A row for {table} has no '{key_caption}' — cannot deduplicate. "
                     "Field captions may have drifted; check the VDS manifest."
                 )
-            params.append([row.get(caption) for caption, _ in TS_EVENTS_COLUMNS] + [run_id])
+            params.append([row.get(caption) for caption, _ in columns] + [run_id])
         if not params:
             return 0
-        before = self._event_count()
-        columns = ", ".join(column for _, column in TS_EVENTS_COLUMNS) + ", first_seen_run"
-        placeholders = ", ".join("?" for _ in range(len(TS_EVENTS_COLUMNS) + 1))
+        before = self._row_count(table)
+        names = ", ".join(column for _, column in columns) + ", first_seen_run"
+        placeholders = ", ".join("?" for _ in range(len(columns) + 1))
         self.con.executemany(
-            f"INSERT OR IGNORE INTO history.events ({columns}) VALUES ({placeholders})", params
+            f"INSERT OR IGNORE INTO {table} ({names}) VALUES ({placeholders})", params
         )
-        return self._event_count() - before
+        return self._row_count(table) - before
 
-    def _event_count(self) -> int:
-        row = self.con.execute("SELECT count(*) FROM history.events").fetchone()
+    def _row_count(self, table: str) -> int:
+        row = self.con.execute(f"SELECT count(*) FROM {table}").fetchone()
         assert row is not None
         return int(row[0])
 
@@ -526,7 +570,8 @@ class PackageStore:
               (SELECT count(*) FROM history.events)       AS events,
               (SELECT min(event_date) FROM history.events) AS events_from,
               (SELECT max(event_date) FROM history.events) AS events_to,
-              (SELECT count(*) FROM meta.v_event_gaps)    AS coverage_gaps
+              (SELECT count(*) FROM meta.v_event_gaps)    AS coverage_gaps,
+              (SELECT count(*) FROM history.job_runs)     AS job_runs
             """
         ).fetchone()
         assert counts is not None
@@ -543,5 +588,6 @@ class PackageStore:
             "events_from": counts[4],
             "events_to": counts[5],
             "coverage_gaps": counts[6],
+            "job_runs": counts[7],
             "last_run": last,
         }

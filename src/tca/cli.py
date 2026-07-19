@@ -464,6 +464,7 @@ def summary(config: Path = CONFIG_OPTION) -> None:
             table.add_row("response pages", str(info["response_pages"]))
             table.add_row("users in identity vault", str(info["known_users"]))
             table.add_row("events in history", str(info["events"]))
+            table.add_row("job runs in history", str(info["job_runs"]))
             if info["events"]:
                 table.add_row(
                     "event history window", f"{info['events_from']} → {info['events_to']}"

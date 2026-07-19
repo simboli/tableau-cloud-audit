@@ -93,7 +93,7 @@ releases. `tca verify` uses the same call to check VDS access at kick-off.
 | Permissions | same | Cross-validation of permission data (Tableau's own user × item × capability rows) | **yes** — `User LUID` → U-####; `User Email`/`Grantee Name`/`Grantee LUID` never requested | ✅ implemented (`activity` module) |
 | Subscriptions | same | Delivery health: status, last sent, consecutive failures | minimized — subscriber/creator/owner identity fields and free-text `Subject` never requested (REST already collects them) | ✅ implemented (`activity` module) |
 | Tokens | same | PAT hygiene: stale tokens, leaver-owned tokens | **yes** — `Owner Email` → U-#### via reverse vault lookup (unknown → `[redacted]`); `Database User Name`/`Device Name` never requested | ✅ implemented (`activity` module) |
-| Job Performance | same | Refresh failure rates, durations, queue delay | **yes** — `Owner Email` → U-#### via reverse lookup; `Error Message`/`Subscriber Email`/Bridge fields never requested | ✅ implemented (`activity` module) |
+| Job Performance | same | Refresh failure rates, durations, queue delay; rows also accumulate into `history.job_runs` (dedup on Job ID — outlives retention) | **yes** — `Owner Email` → U-#### via reverse lookup; `Error Message`/`Subscriber Email`/Bridge fields never requested | ✅ implemented (`activity` module) |
 | Viz Load Times | same | View/datasource load durations and failures | minimized — owner e-mails, `HTTP User Agent` and `HTTP Request URI` never requested | ✅ implemented (`activity` module) |
 
 Fallback chain (same package schema regardless of path): VDS → Hyper extract download → guided CSV import. Status: 💤 backlog.

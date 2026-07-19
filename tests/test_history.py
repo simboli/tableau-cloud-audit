@@ -105,3 +105,49 @@ def test_summary_includes_history(store: PackageStore) -> None:
     s = store.summary()
     assert s["events"] == 1
     assert str(s["events_from"]).startswith("2026-05-01")
+
+
+def job_run(job_id: int, created_at: str, result: str = "Succeeded") -> dict[str, Any]:
+    return {
+        "Job ID": job_id,
+        "Job LUID": f"job-{job_id}",
+        "Job Type": "Extract Refresh",
+        "Job Result": result,
+        "Final Job Result": result,
+        "Was Manual Run": False,
+        "Item LUID": "ds-1",
+        "Item Type": "Data Source",
+        "Item Name": "Sales",
+        "Created At": created_at,
+        "Job Duration": 12.5,
+        "Owner Email": "U-0001",
+    }
+
+
+def test_job_runs_deduplicate_across_runs(store: PackageStore) -> None:
+    run1 = store.begin_run(modules=["activity"])
+    assert store.insert_job_runs(run1, [job_run(1, "2026-06-01T10:00:00")]) == 1
+
+    run2 = store.begin_run(modules=["activity"])
+    inserted = store.insert_job_runs(
+        run2, [job_run(1, "2026-06-01T10:00:00"), job_run(2, "2026-07-01T10:00:00", "Failed")]
+    )
+    assert inserted == 1  # only the new one
+
+    rows = store.con.execute(
+        "SELECT job_id, job_result, owner_email, first_seen_run "
+        "FROM history.job_runs ORDER BY job_id"
+    ).fetchall()
+    assert rows == [(1, "Succeeded", "U-0001", run1), (2, "Failed", "U-0001", run2)]
+
+
+def test_job_run_without_id_fails_loudly(store: PackageStore) -> None:
+    run_id = store.begin_run(modules=["activity"])
+    with pytest.raises(StorageError, match="Job ID"):
+        store.insert_job_runs(run_id, [{"Created At": "2026-06-01T10:00:00"}])
+
+
+def test_summary_includes_job_runs(store: PackageStore) -> None:
+    run_id = store.begin_run(modules=["activity"])
+    store.insert_job_runs(run_id, [job_run(1, "2026-06-01T10:00:00")])
+    assert store.summary()["job_runs"] == 1
