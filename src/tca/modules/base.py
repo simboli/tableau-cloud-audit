@@ -9,15 +9,19 @@ scope for this repo, by design).
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
-from typing import Protocol
+from typing import Any, Protocol
 
 from tca.pseudo.scrubber import Scrubber
 from tca.sources.metadata import MetadataApi
 from tca.sources.rest import TableauRest
 from tca.sources.vds import VizqlDataService
 from tca.storage.writer import PackageStore
+
+
+def _passthrough_track(items: Sequence[Any], label: str) -> Iterable[Any]:
+    return items
 
 
 @dataclass
@@ -31,6 +35,9 @@ class RunContext:
     # Called with (endpoint, page) after each landed page — the CLI uses it
     # for progress output; modules stay console-agnostic.
     on_page: Callable[[str, int], None] = lambda endpoint, page: None
+    # Wraps a per-item loop for progress display (the CLI injects a rich-based
+    # tracker with a known total; the default is a pass-through).
+    track: Callable[[Sequence[Any], str], Iterable[Any]] = _passthrough_track
     # Units already landed in this run (populated on --resume; empty otherwise).
     # raw.api_responses is the checkpoint: one unit = (endpoint, entity_luid, page).
     done: set[tuple[str, str | None, int]] = field(default_factory=set)

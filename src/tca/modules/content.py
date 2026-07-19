@@ -46,7 +46,7 @@ class ContentModule:
             datasource_luids.extend(_item_ids(payload, "datasources", "datasource"))
 
         # per-item calls last: the expensive loop, and the resume sweet spot
-        for workbook_luid in workbook_luids:
+        for workbook_luid in ctx.track(workbook_luids, "workbook connections"):
             if ctx.is_done(WORKBOOK_CONNECTIONS, workbook_luid):
                 stats.count(WORKBOOK_CONNECTIONS, written=False)
                 continue
@@ -56,7 +56,7 @@ class ContentModule:
                 ctx.land(WORKBOOK_CONNECTIONS, payload, entity_luid=workbook_luid),
             )
 
-        for datasource_luid in datasource_luids:
+        for datasource_luid in ctx.track(datasource_luids, "datasource connections"):
             if ctx.is_done(DATASOURCE_CONNECTIONS, datasource_luid):
                 stats.count(DATASOURCE_CONNECTIONS, written=False)
                 continue

@@ -61,16 +61,16 @@ class PermissionsModule:
                 ctx.rest.project_default_permissions_datasources,
             ),
         ]
-        for project_luid in project_luids:
+        for project_luid in ctx.track(project_luids, "project permissions"):
             for endpoint, fetch in per_project:
                 _land_item(ctx, stats, endpoint, project_luid, fetch)
 
-        for workbook_luid in workbook_luids:
+        for workbook_luid in ctx.track(workbook_luids, "workbook permissions"):
             _land_item(
                 ctx, stats, WORKBOOK_PERMISSIONS, workbook_luid, ctx.rest.workbook_permissions
             )
 
-        for datasource_luid in datasource_luids:
+        for datasource_luid in ctx.track(datasource_luids, "datasource permissions"):
             _land_item(
                 ctx, stats, DATASOURCE_PERMISSIONS, datasource_luid, ctx.rest.datasource_permissions
             )

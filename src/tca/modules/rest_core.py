@@ -29,7 +29,7 @@ class RestCoreModule:
             stats.count(GROUPS, ctx.land(GROUPS, payload, page=page))
             group_luids.extend(_group_ids(payload))
 
-        for group_luid in group_luids:
+        for group_luid in ctx.track(group_luids, "group membership"):
             # resume: skip the whole per-group call if its first page landed
             if ctx.is_done(GROUP_USERS, group_luid):
                 stats.count(GROUP_USERS, written=False)

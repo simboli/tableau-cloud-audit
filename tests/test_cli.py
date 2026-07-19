@@ -137,6 +137,10 @@ def test_collect_end_to_end_then_summary_and_resolve(workdir: Path, httpx_mock: 
     assert result.exit_code == 0, result.output
     assert "run #1" in plain(result.output)
     assert "No real identities" in plain(result.output)
+    # listing pages still print one line each; per-item loops (group membership
+    # here) report through the progress bar instead of a line per page
+    assert "/users — page 1" in plain(result.output)
+    assert "/groups/{luid}/users — page" not in plain(result.output)
 
     result = runner.invoke(app, ["summary"])
     assert result.exit_code == 0, result.output

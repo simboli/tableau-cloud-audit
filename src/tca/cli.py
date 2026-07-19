@@ -9,11 +9,21 @@ from __future__ import annotations
 
 import hashlib
 import time
+from collections.abc import Iterator, Sequence
 from pathlib import Path
+from typing import Any
 
 import typer
 from rich.console import Console
 from rich.panel import Panel
+from rich.progress import (
+    BarColumn,
+    MofNCompleteColumn,
+    Progress,
+    SpinnerColumn,
+    TextColumn,
+    TimeRemainingColumn,
+)
 from rich.table import Table
 
 from tca import __version__
@@ -307,14 +317,41 @@ def collect(
                         modules=[m.name for m in selected], rest_api_version=client.api_version
                     )
 
+                progress = Progress(
+                    SpinnerColumn(),
+                    TextColumn("[progress.description]{task.description}"),
+                    BarColumn(),
+                    MofNCompleteColumn(),
+                    TimeRemainingColumn(),
+                    console=console,
+                    transient=True,
+                )
+                active_tracks = 0
+
+                def track(items: Sequence[Any], label: str) -> Iterator[Any]:
+                    nonlocal active_tracks
+                    task_id = progress.add_task(label, total=len(items))
+                    active_tracks += 1
+                    try:
+                        for item in items:
+                            yield item
+                            progress.advance(task_id)
+                    finally:
+                        active_tracks -= 1
+                        progress.remove_task(task_id)
+
+                def on_page(endpoint: str, page: int) -> None:
+                    # per-item loops report through the progress bar instead
+                    if active_tracks == 0:
+                        console.print(f"  [dim]{endpoint} — page {page}[/dim]")
+
                 ctx = modules_base.RunContext(
                     rest=TableauRest(client),
                     store=store,
                     scrubber=Scrubber(store, run_id),
                     run_id=run_id,
-                    on_page=lambda endpoint, page: console.print(
-                        f"  [dim]{endpoint} — page {page}[/dim]"
-                    ),
+                    on_page=on_page,
+                    track=track,
                     done=done,
                     vds=VizqlDataService(client),
                     metadata=MetadataApi(client),
@@ -323,12 +360,13 @@ def collect(
                 skipped = 0
                 denied: list[tuple[str, str]] = []
                 try:
-                    for module in selected:
-                        console.print(f"[bold]→ module {module.name}[/bold]")
-                        stats = module.run(ctx)
-                        all_stats.update(stats.pages)
-                        skipped += stats.skipped
-                        denied.extend(stats.denied)
+                    with progress:
+                        for module in selected:
+                            console.print(f"[bold]→ module {module.name}[/bold]")
+                            stats = module.run(ctx)
+                            all_stats.update(stats.pages)
+                            skipped += stats.skipped
+                            denied.extend(stats.denied)
                 except KeyboardInterrupt:
                     store.finish_run(run_id, "partial", notes="interrupted by user")
                     console.print(
