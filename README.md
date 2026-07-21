@@ -120,6 +120,13 @@ convenience views included:
 
 More recipes like this in the [query cookbook](docs/cookbook.md).
 
+## Have a question? Ask an AI
+
+Got a doubt about how this project works, or how to use or extend it? Hand
+[`AI_GUIDE.md`](AI_GUIDE.md) to Claude (or any capable AI assistant) and then
+ask away — it briefs the assistant on the project's purpose, architecture,
+privacy model, and conventions so you get grounded answers instead of guesses.
+
 ## Requirements
 
 - Python ≥ 3.11
