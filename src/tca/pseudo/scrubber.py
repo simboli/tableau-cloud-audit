@@ -30,6 +30,12 @@ from tca.storage.writer import PackageStore
 
 _EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 
+# Admin Insights uses the literal string "NA" in a LUID column when the row has
+# no user (e.g. a group grantee in the Permissions datasource). It is NOT a user
+# LUID: pseudonymising it would poison the identity vault with a 2-char token and
+# trip the substring safety net on every subsequent payload. Treat it as absent.
+_NON_USER_LUID = frozenset({"NA"})
+
 
 class ScrubError(RuntimeError):
     """A privacy violation was about to happen; the write was blocked."""
@@ -78,6 +84,8 @@ class Scrubber:
                 raise ScrubError(f"VDS row in '{endpoint}' is not an object.")
             if spec.luid_column is not None:
                 luid = row.get(spec.luid_column)
+                if isinstance(luid, str) and luid.strip() in _NON_USER_LUID:
+                    luid = None
                 attrs = {
                     attr: value
                     for attr, column in spec.identity_attr_columns.items()

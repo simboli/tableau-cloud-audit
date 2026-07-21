@@ -159,6 +159,25 @@ def test_vds_email_columns_resolve_via_vault(store: PackageStore, scrubber: Scru
     assert t1["PAT Name"] == "ci-token"
 
 
+def test_vds_na_luid_is_not_a_user(store: PackageStore, scrubber: Scrubber) -> None:
+    # Admin Insights writes the literal "NA" in User LUID for group grantees.
+    # It must not be pseudonymised, must not enter the vault, and must not trip
+    # the substring safety net on this or any later payload.
+    scrubber.scrub("/users", USERS_PAGE)  # vault now knows the real LUIDs
+    permissions = {
+        "data": [
+            {"Item Name": "Sales", "User LUID": "aa11bb22-0000-1111-2222-333344445555",
+             "User Site Role": "Creator"},
+            {"Item Name": "Finance", "User LUID": "NA", "User Site Role": "NA"},
+        ]
+    }
+    out = scrubber.scrub("vds:permissions", permissions)
+    user_row, group_row = out["data"]
+    assert user_row["User LUID"] == "U-0001"  # real grantee pseudonymised
+    assert group_row["User LUID"] == "NA"  # placeholder untouched, not PII
+    assert "NA" not in store.known_luids()  # vault never poisoned
+
+
 def test_connection_username_is_redacted(scrubber: Scrubber) -> None:
     payload = {
         "connections": {
