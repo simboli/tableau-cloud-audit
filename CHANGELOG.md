@@ -44,6 +44,15 @@ test). Schema versions are tracked independently in `meta.schema_migrations`.
 
 ### Fixed
 
+- **Scrub no longer aborts on the `Permissions` Admin Insights source.** Tableau
+  writes the literal `"NA"` in the User LUID column for non-user (group)
+  grantees; the VDS scrubber pseudonymised it as a real user LUID, poisoning the
+  identity vault with a 2-character token. The substring safety net then matched
+  that token inside legitimate data (e.g. `"User Site Role": "NA"`) and blocked
+  every subsequent payload with a false-positive `ScrubError`. `"NA"` is now
+  treated as absent (neither pseudonymised nor stored), and the safety net scans
+  only UUID-shaped known LUIDs — a degenerate vault token can no longer make it
+  pathological. Real LUIDs surviving a scrub are still blocked.
 - **Partial runs no longer empty the `v_*_current` / `clear.*` views**
   (schema v0.7): each view now follows the latest ok run that actually
   collected its data (`meta.v_endpoint_latest_run`), instead of the single
