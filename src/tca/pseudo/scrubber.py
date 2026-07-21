@@ -29,6 +29,13 @@ from tca.pseudo.manifest import (
 from tca.storage.writer import PackageStore
 
 _EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
+# A Tableau user LUID is a UUID. The safety net scans known LUIDs as substrings
+# (to catch one embedded in a hyperlink, path or free-text field): only values of
+# this shape are eligible, so a degenerate vault token can never make that scan
+# pathological, matching innocuous fragments of legitimate data.
+_LUID_RE = re.compile(
+    r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
+)
 
 # Admin Insights uses the literal string "NA" in a LUID column when the row has
 # no user (e.g. a group grantee in the Permissions datasource). It is NOT a user
@@ -183,7 +190,7 @@ class Scrubber:
                 "this endpoint. Nothing was written."
             )
         for luid in self._store.known_luids():
-            if luid in text:
+            if _LUID_RE.fullmatch(luid) and luid in text:
                 raise ScrubError(
                     f"Safety net: known user LUID '{luid[:8]}…' survived scrubbing "
                     f"in '{endpoint}'. The PII manifest is likely missing a path "

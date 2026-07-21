@@ -113,6 +113,17 @@ def test_safety_net_blocks_known_luid_leak(scrubber: Scrubber) -> None:
         scrubber.scrub("/groups", leak)
 
 
+def test_safety_net_ignores_non_luid_vault_token(store: PackageStore) -> None:
+    # Defense in depth: even if a degenerate (non-UUID) token reaches the vault,
+    # the substring scan must skip it instead of matching innocuous fragments of
+    # legitimate data (here "NA" inside "NASA Analytics").
+    run_id = store.begin_run(modules=["rest_core"])
+    store.upsert_identity(run_id, user_luid="NA")
+    payload = {"groups": {"group": [{"id": "g-1", "name": "NASA Analytics"}]}}
+    out = Scrubber(store, run_id).scrub("/groups", payload)  # must not raise
+    assert out["groups"]["group"][0]["name"] == "NASA Analytics"
+
+
 def test_single_object_instead_of_list(scrubber: Scrubber) -> None:
     # Tableau REST sometimes returns a bare object where a list is expected
     page = {"users": {"user": {"id": "ee55ff66-0000-1111-2222-333344445555", "name": "solo"}}}
@@ -166,8 +177,11 @@ def test_vds_na_luid_is_not_a_user(store: PackageStore, scrubber: Scrubber) -> N
     scrubber.scrub("/users", USERS_PAGE)  # vault now knows the real LUIDs
     permissions = {
         "data": [
-            {"Item Name": "Sales", "User LUID": "aa11bb22-0000-1111-2222-333344445555",
-             "User Site Role": "Creator"},
+            {
+                "Item Name": "Sales",
+                "User LUID": "aa11bb22-0000-1111-2222-333344445555",
+                "User Site Role": "Creator",
+            },
             {"Item Name": "Finance", "User LUID": "NA", "User Site Role": "NA"},
         ]
     }
