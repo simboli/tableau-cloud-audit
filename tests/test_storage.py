@@ -109,3 +109,24 @@ def test_summary(store: PackageStore) -> None:
     s = store.summary()
     assert (s["runs"], s["response_pages"], s["known_users"]) == (1, 1, 1)
     assert s["last_run"][3] == "ok"
+
+
+def test_runs(store: PackageStore) -> None:
+    store.init_file_info("luid-1", "acme", "eu-west-1a")
+    r1 = store.begin_run(modules=["rest_core"])
+    store.write_response(r1, "/users", {"a": 1})
+    store.finish_run(r1, "ok")
+    r2 = store.begin_run(modules=["rest_core", "content"])
+    store.write_response(r2, "/users", {"a": 1})
+    store.write_response(r2, "/groups", {"b": 2})
+    store.finish_run(r2, "partial", notes="interrupted")
+
+    rows = store.runs()
+    assert [r[0] for r in rows] == [r2, r1]  # newest first
+    # columns: run_id, status, started_at, finished_at, modules_run, notes, pages
+    newest = rows[0]
+    assert newest[1] == "partial"
+    assert newest[5] == "interrupted"
+    assert newest[6] == 2  # pages landed in r2
+    assert rows[1][6] == 1  # pages landed in r1
+    assert [r[0] for r in store.runs(limit=1)] == [r2]

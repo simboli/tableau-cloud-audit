@@ -485,6 +485,69 @@ def summary(config: Path = CONFIG_OPTION) -> None:
         raise _fail(str(exc)) from exc
 
 
+_RUN_STATUS_STYLE = {
+    "ok": "green",
+    "partial": "yellow",
+    "running": "cyan",
+    "failed": "red",
+    "aborted": "red",
+}
+
+
+def _fmt_duration(started: Any, finished: Any) -> str:
+    if started is None or finished is None:
+        return "—"
+    seconds = (finished - started).total_seconds()
+    if seconds < 60:
+        return f"{seconds:.0f}s"
+    minutes, secs = divmod(int(seconds), 60)
+    return f"{minutes}m{secs:02d}s"
+
+
+@app.command()
+def runs(
+    config: Path = CONFIG_OPTION,
+    limit: int | None = typer.Option(
+        None, "--limit", "-n", help="Show only the most recent N runs (default: all)."
+    ),
+) -> None:
+    """List every collection run with its status — the run log."""
+    try:
+        cfg = Config.load(config)
+        if not cfg.database_path.exists():
+            raise _fail(f"No package file at {cfg.database_path} — run `tca collect` first.")
+        with PackageStore(cfg.database_path, db_key()) as store:
+            rows = store.runs(limit)
+            if not rows:
+                console.print("No collection runs yet — run `tca collect` first.")
+                return
+            table = Table(title="collection runs")
+            table.add_column("run", justify="right")
+            table.add_column("status")
+            table.add_column("started")
+            table.add_column("duration", justify="right")
+            table.add_column("pages", justify="right")
+            table.add_column("modules")
+            notes: list[tuple[Any, Any]] = []
+            for run_id, status, started, finished, modules, note, pages in rows:
+                style = _RUN_STATUS_STYLE.get(status, "white")
+                table.add_row(
+                    str(run_id),
+                    f"[{style}]{status}[/{style}]",
+                    str(started).split(".")[0],
+                    _fmt_duration(started, finished),
+                    str(pages),
+                    ", ".join(modules or []),
+                )
+                if note:
+                    notes.append((run_id, note))
+            console.print(table)
+            for run_id, note in notes:
+                console.print(f"[dim]run #{run_id}: {note}[/dim]")
+    except _USER_ERRORS as exc:
+        raise _fail(str(exc)) from exc
+
+
 # -------------------------------------------------------------------- export
 
 

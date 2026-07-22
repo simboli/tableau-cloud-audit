@@ -612,3 +612,16 @@ class PackageStore:
             "job_runs": counts[7],
             "last_run": last,
         }
+
+    def runs(self, limit: int | None = None) -> list[tuple[Any, ...]]:
+        """Every collection run, newest first: run_id, status, started_at,
+        finished_at, modules_run, notes, and the number of pages it landed."""
+        sql = (
+            "SELECT c.run_id, c.status, c.started_at, c.finished_at, "
+            "c.modules_run, c.notes, "
+            "(SELECT count(*) FROM raw.api_responses r WHERE r.run_id = c.run_id) AS pages "
+            "FROM meta.collection_runs c ORDER BY c.run_id DESC"
+        )
+        if limit is not None:
+            return self.con.execute(sql + " LIMIT ?", [limit]).fetchall()
+        return self.con.execute(sql).fetchall()

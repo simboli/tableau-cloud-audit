@@ -41,6 +41,11 @@ test). Schema versions are tracked independently in `meta.schema_migrations`.
   from raw on every collect, all under the additive-only schema contract.
 - **Progress bars** for the per-item collect loops (connections, permissions,
   group membership) instead of one output line per page.
+- **`tca runs`** — lists every collection run with its status (colour-coded),
+  start time, duration, pages landed and modules, plus per-run notes. `tca
+  summary` shows only the last run; this is the full run log, and since the
+  package file is encrypted the CLI is the only ergonomic way to read it.
+  Optional `--limit/-n` to show only the most recent runs.
 
 ### Fixed
 

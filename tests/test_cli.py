@@ -147,6 +147,11 @@ def test_collect_end_to_end_then_summary_and_resolve(workdir: Path, httpx_mock: 
     assert "acme" in result.output
     assert "collection runs" in plain(result.output)
 
+    result = runner.invoke(app, ["runs"])
+    assert result.exit_code == 0, result.output
+    assert "collection runs" in plain(result.output)
+    assert "ok" in plain(result.output)
+
     result = runner.invoke(app, ["resolve", "U-0001"])
     assert result.exit_code == 0, result.output
     assert "m.rossi@acme.it" in result.output
@@ -166,6 +171,13 @@ def test_collect_unknown_module(workdir: Path) -> None:
 def test_summary_without_file(workdir: Path) -> None:
     write_config(workdir)
     result = runner.invoke(app, ["summary"])
+    assert result.exit_code == 1
+    assert "tca collect" in plain(result.output)
+
+
+def test_runs_without_file(workdir: Path) -> None:
+    write_config(workdir)
+    result = runner.invoke(app, ["runs"])
     assert result.exit_code == 1
     assert "tca collect" in plain(result.output)
 
