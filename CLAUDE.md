@@ -470,3 +470,41 @@ Backlog (agreed with maintainer):
   units keyed by (run_id, endpoint, entity_luid, page); resume skips landed units.
   Consequence: per-page commits instead of one transaction per run; run `status`
   carries the truth (ok=complete, partial=interrupted/resumable, failed, aborted).
+
+Backlog added 2026-07-22 (from a repo review — priority order):
+- **State retention / compaction** (bigger, needs design). `state.*` tables keep
+  one full snapshot **per run** (rows grow ~linearly with run count; `v_*_current`
+  reads only the latest). Over months of daily runs the file bloats. `raw` is the
+  source of truth, so old `state` snapshots are rebuildable and therefore prunable.
+  Decide a retention policy (keep last N runs? keep raw, prune state older than the
+  current + history needs? a `tca prune`/vacuum command?) — or explicitly document
+  "state keeps every snapshot by design". Do NOT touch `history` (dedup-append,
+  outlives Admin Insights retention) or `raw` semantics without care.
+- **Export leak re-check symmetry**. `export_redacted` (writer.py) re-verifies
+  no e-mail-shaped strings, but NOT known user LUIDs — while the write-time safety
+  net checks both. Close the asymmetry at the trust boundary: re-scan the export
+  for UUID-shaped known LUIDs too (reuse `_LUID_RE`). Small, defense-in-depth.
+- **Live-data shape fragility** (the "NA" bug class). Scrubber/normalizers trust
+  Tableau's live response shapes; some VDS sources were never verified live; tests
+  are all mocked so they can't catch shape drift or sentinel values ("NA", ...).
+  Add sanitised golden real-response fixtures as regression tests; live-verify the
+  remaining VDS sources; consider a general sentinel-normalisation pass.
+- **Scale validation** — everything so far is validated on a tiny DataDev
+  sandbox. Key insight: the collector's cost is **content-driven** (permissions
+  = per project ×3 + per workbook + per datasource; metadata pagination), not
+  user-driven (`/users` is one cheap paginated call). So the dimension DataDev
+  limits (user seats) is not the expensive path; the expensive one (content) is
+  inflatable. Chosen approach (over spinning up + dropping a throwaway trial,
+  which inherits the same seat limits and needs populating from scratch):
+    1. **Synthetic-scale harness** (highest ROI) — drive the already-mockable
+       transport (`pytest_httpx`) with generated responses at scale (e.g. 5k
+       workbooks, 500 datasources, deep permission matrices, 10k user LUIDs);
+       measure collect + normalize wall-time, `normalize` memory, DuckDB write
+       throughput, file size, and resume correctness on a huge run. Isolates our
+       scaling from Tableau rate/seat limits; repeatable, free, CI-able. Also
+       exercises vault growth / `/users` pagination with zero real users.
+    2. **Content inflation on the existing DataDev site** — programmatically
+       publish many workbooks/datasources via REST to exercise the real
+       expensive path (per-item permission calls, real pagination, rate limits)
+       without needing new users (watch storage/seat limits).
+    3. Real large site → later, with a consenting pilot client.
