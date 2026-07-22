@@ -472,14 +472,32 @@ Backlog (agreed with maintainer):
   carries the truth (ok=complete, partial=interrupted/resumable, failed, aborted).
 
 Backlog added 2026-07-22 (from a repo review — priority order):
-- **State retention / compaction** (bigger, needs design). `state.*` tables keep
-  one full snapshot **per run** (rows grow ~linearly with run count; `v_*_current`
-  reads only the latest). Over months of daily runs the file bloats. `raw` is the
-  source of truth, so old `state` snapshots are rebuildable and therefore prunable.
-  Decide a retention policy (keep last N runs? keep raw, prune state older than the
-  current + history needs? a `tca prune`/vacuum command?) — or explicitly document
-  "state keeps every snapshot by design". Do NOT touch `history` (dedup-append,
-  outlives Admin Insights retention) or `raw` semantics without care.
+- **State retention — DESIGN DECIDED 2026-07-22, ready to implement.** Problem:
+  `normalize_run` does `DELETE FROM {table} WHERE run_id = ?` + INSERT
+  ([normalize.py:237](src/tca/normalize.py#L237)), so `state.*` accumulates one
+  snapshot **per run** → linear (not exponential) unbounded growth (observed:
+  ~12k state rows + ~255 raw pages per run). Chosen fix (repo still private → free
+  to change schema, no history/compat to preserve):
+    1. **Make `state` current-only.** `normalize` does **replace-per-endpoint**
+       (delete that endpoint's rows across ALL runs, insert the current run's)
+       instead of `DELETE WHERE run_id`. State size then depends on SITE size, not
+       run count → O(1) in runs. This kills the main bloat.
+    2. **Simplify the `v_*_current` views** — state IS current now; this also
+       removes `v_endpoint_latest_run`'s dependency on `raw` (migration 007) and
+       the whole "keep latest-ok-per-endpoint" guard we'd otherwise need.
+    3. **One retention knob for `raw`**: `[retention] raw_days` in `collector.toml`
+       (default `0` = keep forever / opt-in prune). Prune at END of collect (after
+       normalize + history accumulation), then `CHECKPOINT` to actually reclaim
+       bytes (DuckDB doesn't shrink the file on DELETE alone).
+    Growth guarantee: state current-only + finite `raw_days` = **plateau**; state
+    current-only + raw forever = slow linear (raw only, no compounding).
+    NEVER prune `history` (dedup-append, the intentional archive), `identity`
+    (pseudonym stability), or `meta.collection_runs`/`event_coverage` (keep the run
+    log + gap detection). Trade-off accepted: no stored state-history — recoverable
+    from `raw` on demand, and `history.*` already covers the event time-series.
+    Implementation checklist: normalize → replace-per-endpoint; simplify v_*_current
+    (+ likely a migration 008); parse `[retention]` in config.py; prune + CHECKPOINT
+    hooked at end of `collect`; update the schema-contract test + add tests.
 - **Export leak re-check symmetry**. `export_redacted` (writer.py) re-verifies
   no e-mail-shaped strings, but NOT known user LUIDs — while the write-time safety
   net checks both. Close the asymmetry at the trust boundary: re-scan the export
