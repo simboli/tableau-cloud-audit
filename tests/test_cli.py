@@ -152,6 +152,11 @@ def test_collect_end_to_end_then_summary_and_resolve(workdir: Path, httpx_mock: 
     assert "collection runs" in plain(result.output)
     assert "ok" in plain(result.output)
 
+    # machine-readable last outcome for scheduling: only the status, nothing else
+    result = runner.invoke(app, ["runs", "--last", "-q"])
+    assert result.exit_code == 0, result.output
+    assert result.output.strip() == "ok"
+
     result = runner.invoke(app, ["resolve", "U-0001"])
     assert result.exit_code == 0, result.output
     assert "m.rossi@acme.it" in result.output

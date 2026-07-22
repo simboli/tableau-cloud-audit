@@ -45,7 +45,10 @@ test). Schema versions are tracked independently in `meta.schema_migrations`.
   start time, duration, pages landed and modules, plus per-run notes. `tca
   summary` shows only the last run; this is the full run log, and since the
   package file is encrypted the CLI is the only ergonomic way to read it.
-  Optional `--limit/-n` to show only the most recent runs.
+  Optional `--limit/-n` to show only the most recent runs. `tca runs --last
+  -q` prints just the last run's status (machine-readable), so a scheduled
+  pipeline can branch on it — e.g. resume a `partial` run instead of starting
+  a fresh one.
 
 ### Fixed
 

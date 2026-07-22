@@ -510,14 +510,31 @@ def runs(
     limit: int | None = typer.Option(
         None, "--limit", "-n", help="Show only the most recent N runs (default: all)."
     ),
+    last: bool = typer.Option(False, "--last", help="Only the most recent run."),
+    quiet: bool = typer.Option(
+        False,
+        "--quiet",
+        "-q",
+        help="Print only each run's status, one per line (machine-readable). "
+        "Pair with --last to get the last run's outcome for scripting.",
+    ),
 ) -> None:
-    """List every collection run with its status — the run log."""
+    """List every collection run with its status — the run log.
+
+    `tca runs --last -q` prints just the last run's status (ok, partial,
+    failed, ...) so a scheduled pipeline can branch on it, e.g. resume a
+    `partial` run instead of starting a fresh one.
+    """
     try:
         cfg = Config.load(config)
         if not cfg.database_path.exists():
             raise _fail(f"No package file at {cfg.database_path} — run `tca collect` first.")
         with PackageStore(cfg.database_path, db_key()) as store:
-            rows = store.runs(limit)
+            rows = store.runs(1 if last else limit)
+            if quiet:
+                for row in rows:
+                    typer.echo(row[1])
+                return
             if not rows:
                 console.print("No collection runs yet — run `tca collect` first.")
                 return
