@@ -1,9 +1,11 @@
 """Mechanical normalization: raw pages -> typed state tables.
 
-Runs at the end of every collect. For each run, state rows are DERIVED from
-the raw pages of that run and fully rebuilt (delete + insert): raw stays the
-source of truth, re-running is always safe, and a resumed run normalizes
-exactly what it landed.
+Runs at the end of every collect. State is **current-only**: for every state
+table the run actually collected (its source endpoint landed a page this run),
+the whole table is replaced with the fresh snapshot; tables the run did not
+collect keep their previous snapshot. So `state.*` holds exactly one snapshot
+per table and its size tracks the SITE, not the number of runs. Raw stays the
+source of truth (state is rebuildable from it), and re-running is always safe.
 
 Strictly mechanical by design — field renaming, timestamp parsing, list
 flattening. Anything that *evaluates* the site (tiers, scores, effective
@@ -220,27 +222,36 @@ Rows = dict[str, list[list[Any]]]
 
 
 def normalize_run(store: PackageStore, run_id: int) -> dict[str, int]:
-    """Rebuild the state tables for one run from its raw pages."""
+    """Rebuild the state tables this run collected, current-only (see module doc).
+
+    A table is REPLACED (whole snapshot, all runs) iff this run landed a page of
+    one of its source endpoints — even when that page was an empty listing (so a
+    genuinely-empty result correctly clears the table). Tables whose sources this
+    run did not collect are left untouched, carrying the previous snapshot.
+    """
     pages = store.con.execute(
         "SELECT endpoint, entity_luid, payload FROM raw.api_responses WHERE run_id = ?",
         [run_id],
     ).fetchall()
 
     rows: Rows = {table: [] for table in STATE_TABLES}
+    touched: set[str] = set()
     rule_counter = _Counter()
     for endpoint, entity_luid, payload_json in pages:
+        touched.update(_ENDPOINT_STATE_TABLES.get(endpoint, ()))
         payload = json.loads(payload_json)
         _dispatch(endpoint, entity_luid, payload, run_id, rows, rule_counter)
 
     with store.transaction():
-        for table, columns in STATE_TABLES.items():
-            store.con.execute(f"DELETE FROM {table} WHERE run_id = ?", [run_id])
+        for table in touched:
+            columns = STATE_TABLES[table]
+            store.con.execute(f"DELETE FROM {table}")
             if rows[table]:
                 placeholders = ", ".join("?" for _ in columns.split(","))
                 store.con.executemany(
                     f"INSERT INTO {table} ({columns}) VALUES ({placeholders})", rows[table]
                 )
-    return {table: len(table_rows) for table, table_rows in rows.items() if table_rows}
+    return {table: len(rows[table]) for table in touched if rows[table]}
 
 
 class _Counter:
@@ -374,6 +385,31 @@ _PERMISSION_ENDPOINTS: dict[str, tuple[str, bool, str | None]] = {
     rest.PROJECT_DEFAULT_PERMISSIONS_DATASOURCES: ("project", True, "datasource"),
     rest.WORKBOOK_PERMISSIONS: ("workbook", False, None),
     rest.DATASOURCE_PERMISSIONS: ("datasource", False, None),
+}
+
+# Which state table(s) each source endpoint feeds — drives current-only
+# replacement in normalize_run. Reuses _VDS_STATE and _PERMISSION_ENDPOINTS so
+# those never drift; only REST and GraphQL are spelled out. A consistency test
+# asserts this covers exactly STATE_TABLES (tests/test_normalize.py).
+_ENDPOINT_STATE_TABLES: dict[str, tuple[str, ...]] = {
+    rest.USERS: ("state.users",),
+    rest.GROUPS: ("state.groups",),
+    rest.GROUP_USERS: ("state.group_members",),
+    rest.PROJECTS: ("state.projects",),
+    rest.WORKBOOKS: ("state.content_items",),
+    rest.DATASOURCES: ("state.content_items",),
+    rest.VIEWS: ("state.views",),
+    rest.WORKBOOK_CONNECTIONS: ("state.connections",),
+    rest.DATASOURCE_CONNECTIONS: ("state.connections",),
+    **{endpoint: ("state.permission_rules",) for endpoint in _PERMISSION_ENDPOINTS},
+    **{endpoint: (table,) for endpoint, (table, _cols) in _VDS_STATE.items()},
+    "graphql:datasources": ("state.datasource_fields", "state.upstream_tables"),
+    "graphql:workbooks": (
+        "state.workbook_datasources",
+        "state.datasource_fields",
+        "state.upstream_tables",
+        "state.sheet_fields",
+    ),
 }
 
 

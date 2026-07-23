@@ -24,3 +24,11 @@ pat_name = "tca-collector"
 # The DuckDB package file the collector writes to. Relative paths are
 # resolved against this config file's directory.
 database = "your-site-name.duckdb"
+
+# Optional retention. Typed `state` is current-only (it never accumulates), so
+# only the raw archive grows run after run. `raw_days` caps it: at the end of
+# each collect, raw pages of runs older than this many days are pruned (the run
+# just collected is always kept). 0 = keep everything forever (default) — the
+# file stays a full archive. Set a finite value to bound disk use.
+# [retention]
+# raw_days = 30

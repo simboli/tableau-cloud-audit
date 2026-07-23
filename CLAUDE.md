@@ -472,7 +472,13 @@ Backlog (agreed with maintainer):
   carries the truth (ok=complete, partial=interrupted/resumable, failed, aborted).
 
 Backlog added 2026-07-22 (from a repo review — priority order):
-- **State retention — DESIGN DECIDED 2026-07-22, ready to implement.** Problem:
+- **State retention — DONE 2026-07-23 (schema v0.8).** Implemented as designed:
+  `normalize` is current-only (replace-per-collected-table, drift-guarded map),
+  migration 008 simplifies `v_*_current` + retires `v_endpoint_latest_run` +
+  heals existing files, `[retention] raw_days` prunes old raw + CHECKPOINT at end
+  of collect. Verified live: v0.7→v0.8 collapsed 2 accumulated snapshots to 1,
+  and a 3rd run kept state at one snapshot per table. Original design notes below.
+  Problem:
   `normalize_run` does `DELETE FROM {table} WHERE run_id = ?` + INSERT
   ([normalize.py:237](src/tca/normalize.py#L237)), so `state.*` accumulates one
   snapshot **per run** → linear (not exponential) unbounded growth (observed:

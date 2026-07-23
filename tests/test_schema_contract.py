@@ -22,7 +22,7 @@ import pytest
 from tca.storage.writer import PackageStore
 
 # ---------------------------------------------------------------------------
-# Golden contract — schema v0.7 (2026-07-19)
+# Golden contract — schema v0.8 (2026-07-23)
 # ---------------------------------------------------------------------------
 
 GOLDEN_TABLES: dict[str, dict[str, str]] = {
@@ -345,7 +345,8 @@ GOLDEN_TABLES: dict[str, dict[str, str]] = {
 
 GOLDEN_VIEWS: set[str] = {
     "meta.v_latest_run",
-    "meta.v_endpoint_latest_run",
+    # meta.v_endpoint_latest_run retired in v0.8 (state is current-only, views no
+    # longer pick a run) — removing a view is allowed while the repo is private.
     "meta.v_event_gaps",
     "state.v_users_current",
     "state.v_groups_current",

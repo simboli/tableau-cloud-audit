@@ -388,6 +388,12 @@ def collect(
                 if denied:
                     notes = f"{len(denied)} item(s) denied (403/404), e.g. Personal Space content"
                 store.finish_run(run_id, "ok", notes=notes)
+                pruned = store.prune_raw(cfg.retention.raw_days, keep_run_id=run_id)
+                if pruned:
+                    console.print(
+                        f"[dim]retention: pruned {pruned} raw page(s) from runs older "
+                        f"than {cfg.retention.raw_days}d[/dim]"
+                    )
                 if skipped:
                     console.print(f"[dim]{skipped} already-collected pages skipped (resume)[/dim]")
                 if denied:

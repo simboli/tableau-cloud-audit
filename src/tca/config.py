@@ -13,7 +13,7 @@ import os
 import tomllib
 from pathlib import Path
 
-from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 PAT_SECRET_ENV = "TCA_PAT_SECRET"
 DB_KEY_ENV = "TCA_DB_KEY"
@@ -24,6 +24,27 @@ class ConfigError(RuntimeError):
     """A configuration problem the user can act on."""
 
 
+class RetentionConfig(BaseModel):
+    """Optional [retention] table in collector.toml.
+
+    State is current-only, so it never accumulates; only the raw archive grows
+    per run. `raw_days` caps that: at the end of each collect, raw pages of runs
+    older than this are pruned (the current run is always kept). 0 = keep forever
+    (the default — the file stays a full archive; opt in to pruning).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    raw_days: int = 0
+
+    @field_validator("raw_days")
+    @classmethod
+    def _non_negative(cls, value: int) -> int:
+        if value < 0:
+            raise ValueError("raw_days must be >= 0 (0 = keep forever)")
+        return value
+
+
 class Config(BaseModel):
     model_config = ConfigDict(extra="forbid")  # typos in collector.toml fail loudly
 
@@ -31,6 +52,7 @@ class Config(BaseModel):
     pod: str
     pat_name: str
     database: str
+    retention: RetentionConfig = Field(default_factory=RetentionConfig)
 
     # set by load(); not part of the TOML
     _config_dir: Path = Path(".")

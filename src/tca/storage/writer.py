@@ -14,7 +14,7 @@ from __future__ import annotations
 import json
 from collections.abc import Iterator
 from contextlib import contextmanager
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from importlib import resources
 from pathlib import Path
 from types import TracebackType
@@ -34,6 +34,7 @@ MIGRATIONS: tuple[tuple[str, str], ...] = (
     ("0.5", "005_job_history.sql"),
     ("0.6", "006_vds_metadata_state.sql"),
     ("0.7", "007_current_view_semantics.sql"),
+    ("0.8", "008_state_current_only.sql"),
 )
 SCHEMA_VERSION = MIGRATIONS[-1][0]
 _CATALOG = "pkg"
@@ -457,21 +458,13 @@ class PackageStore:
     # Convenience views recreated inside the export (views are not tables, so
     # the table copy alone would drop them). ONLY views that touch no identity
     # data belong here — the clear.* views must never appear. Keep definitions
-    # in sync with the migrations (002/003/007). Order matters: dependencies
-    # first.
+    # in sync with the migrations (002/003/008). Order matters: dependencies
+    # first. State is current-only (migration 008), so v_*_current read state
+    # directly and no longer need meta.v_endpoint_latest_run.
     EXPORT_SAFE_VIEWS: tuple[tuple[str, str], ...] = (
         (
             "meta.v_latest_run",
             "SELECT max(run_id) AS run_id FROM meta.collection_runs WHERE status = 'ok'",
-        ),
-        (
-            "meta.v_endpoint_latest_run",
-            """
-            SELECT r.endpoint, max(r.run_id) AS run_id
-            FROM raw.api_responses r
-            JOIN meta.collection_runs c ON c.run_id = r.run_id AND c.status = 'ok'
-            GROUP BY r.endpoint
-            """,
         ),
         (
             "meta.v_event_gaps",
@@ -485,31 +478,10 @@ class PackageStore:
             FROM w WHERE prev_end IS NOT NULL AND window_start > prev_end
             """,
         ),
-        (
-            "state.v_users_current",
-            "SELECT u.* FROM state.users u WHERE u.run_id = "
-            "(SELECT run_id FROM meta.v_endpoint_latest_run WHERE endpoint = '/users')",
-        ),
-        (
-            "state.v_groups_current",
-            "SELECT g.* FROM state.groups g WHERE g.run_id = "
-            "(SELECT run_id FROM meta.v_endpoint_latest_run WHERE endpoint = '/groups')",
-        ),
-        (
-            "state.v_content_current",
-            "SELECT c.* FROM state.content_items c WHERE c.run_id = "
-            "(SELECT max(run_id) FROM meta.v_endpoint_latest_run "
-            "WHERE endpoint IN ('/workbooks', '/datasources'))",
-        ),
-        (
-            "state.v_permission_rules_current",
-            "SELECT p.* FROM state.permission_rules p WHERE p.run_id = "
-            "(SELECT max(run_id) FROM meta.v_endpoint_latest_run "
-            "WHERE endpoint IN ('/projects/{luid}/permissions', "
-            "'/projects/{luid}/default-permissions/workbooks', "
-            "'/projects/{luid}/default-permissions/datasources', "
-            "'/workbooks/{luid}/permissions', '/datasources/{luid}/permissions'))",
-        ),
+        ("state.v_users_current", "SELECT * FROM state.users"),
+        ("state.v_groups_current", "SELECT * FROM state.groups"),
+        ("state.v_content_current", "SELECT * FROM state.content_items"),
+        ("state.v_permission_rules_current", "SELECT * FROM state.permission_rules"),
     )
 
     def export_redacted(self, dest: Path) -> dict[str, int]:
@@ -625,3 +597,31 @@ class PackageStore:
         if limit is not None:
             return self.con.execute(sql + " LIMIT ?", [limit]).fetchall()
         return self.con.execute(sql).fetchall()
+
+    def prune_raw(self, retain_days: int, keep_run_id: int) -> int:
+        """Delete raw pages of runs older than ``retain_days`` days, reclaiming
+        disk. ``keep_run_id`` (the just-finished run) is always kept. Returns the
+        number of pages deleted; a no-op when ``retain_days <= 0``.
+
+        Safe because state is current-only and no view depends on old raw: raw is
+        pruned as a pure archive-retention step, then a CHECKPOINT reclaims the
+        bytes (DuckDB does not shrink the file on DELETE alone). The lightweight
+        run bookkeeping (meta.collection_runs, event_coverage) is left intact, so
+        a pruned run stays visible in the run log as metadata only.
+        """
+        if retain_days <= 0:
+            return 0
+        cutoff = _now() - timedelta(days=retain_days)
+        victims = "SELECT run_id FROM meta.collection_runs WHERE run_id <> ? AND started_at < ?"
+        deleted = self.con.execute(
+            f"SELECT count(*) FROM raw.api_responses WHERE run_id IN ({victims})",
+            [keep_run_id, cutoff],
+        ).fetchone()
+        assert deleted is not None
+        if deleted[0]:
+            self.con.execute(
+                f"DELETE FROM raw.api_responses WHERE run_id IN ({victims})",
+                [keep_run_id, cutoff],
+            )
+            self.con.execute("CHECKPOINT")
+        return int(deleted[0])

@@ -130,3 +130,34 @@ def test_runs(store: PackageStore) -> None:
     assert newest[6] == 2  # pages landed in r2
     assert rows[1][6] == 1  # pages landed in r1
     assert [r[0] for r in store.runs(limit=1)] == [r2]
+
+
+def test_prune_raw(store: PackageStore) -> None:
+    import datetime as dt
+
+    store.init_file_info("luid-1", "acme", "eu-west-1a")
+    old = store.begin_run(modules=["rest_core"])
+    store.write_response(old, "/users", {"a": 1})
+    store.write_response(old, "/groups", {"b": 2})
+    store.finish_run(old, "ok")
+    # backdate the first run so it falls outside the retention window
+    store.con.execute(
+        "UPDATE meta.collection_runs SET started_at = ? WHERE run_id = ?",
+        [dt.datetime(2020, 1, 1), old],
+    )
+    new = store.begin_run(modules=["rest_core"])
+    store.write_response(new, "/users", {"a": 1})
+    store.finish_run(new, "ok")
+
+    deleted = store.prune_raw(retain_days=7, keep_run_id=new)
+    assert deleted == 2  # the old run's two pages
+    assert store.con.execute(
+        "SELECT count(*) FROM raw.api_responses WHERE run_id = ?", [old]
+    ).fetchone() == (0,)
+    assert store.con.execute(
+        "SELECT count(*) FROM raw.api_responses WHERE run_id = ?", [new]
+    ).fetchone() == (1,)
+    # run bookkeeping survives — a pruned run stays in the log as metadata only
+    assert store.con.execute("SELECT count(*) FROM meta.collection_runs").fetchone() == (2,)
+    # 0 = keep forever: no-op
+    assert store.prune_raw(retain_days=0, keep_run_id=new) == 0

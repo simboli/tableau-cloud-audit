@@ -461,3 +461,29 @@ def test_current_views_follow_latest_run_that_collected_the_data(store: PackageS
     normalize_run(store, run3)
     store.finish_run(run3, "ok")
     assert store.con.execute("SELECT count(*) FROM state.v_users_current").fetchone() == (0,)
+
+
+def test_endpoint_state_tables_covers_all_state_tables() -> None:
+    # Drift guard: every state table must be reachable from some source endpoint,
+    # and no mapping may point at a table that no longer exists.
+    from tca.normalize import _ENDPOINT_STATE_TABLES, STATE_TABLES
+
+    mapped = {table for tables in _ENDPOINT_STATE_TABLES.values() for table in tables}
+    assert mapped == set(STATE_TABLES)
+
+
+def test_state_does_not_accumulate_across_runs(store: PackageStore) -> None:
+    # Current-only: a second full run REPLACES the first snapshot, it never adds
+    # a second one. This is the core of the unbounded-growth fix.
+    r1 = store.begin_run(modules=["rest_core", "content", "permissions"])
+    seed_raw(store, r1)
+    normalize_run(store, r1)
+    r2 = store.begin_run(modules=["rest_core", "content", "permissions"])
+    seed_raw(store, r2)
+    normalize_run(store, r2)
+
+    for table in ("state.users", "state.permission_rules", "state.content_items"):
+        run_ids = store.con.execute(f"SELECT DISTINCT run_id FROM {table}").fetchall()
+        assert run_ids == [(r2,)], f"{table} kept more than the current snapshot"
+    # 2 users total (this run), not 4 (both runs)
+    assert store.con.execute("SELECT count(*) FROM state.users").fetchone() == (2,)

@@ -49,6 +49,24 @@ test). Schema versions are tracked independently in `meta.schema_migrations`.
   -q` prints just the last run's status (machine-readable), so a scheduled
   pipeline can branch on it — e.g. resume a `partial` run instead of starting
   a fresh one.
+- **`[retention] raw_days` in `collector.toml`** — bounds disk use. At the end
+  of each collect, raw pages of runs older than `raw_days` are pruned (the run
+  just collected is always kept), then a `CHECKPOINT` reclaims the bytes.
+  `0` = keep forever (default). `history`, `identity` and the run bookkeeping
+  are never pruned; a pruned run stays in `tca runs` as metadata only.
+
+### Changed
+
+- **Typed `state` is now current-only (schema v0.8).** `normalize` used to keep
+  one `state.*` snapshot **per run**, so the tables grew linearly with the
+  number of runs. Each state table is now REPLACED per collect (a run that did
+  not collect a table's source leaves its previous snapshot intact), so `state`
+  holds exactly one snapshot and its size tracks the SITE, not the run count.
+  Raw stays the source of truth; historical state, if ever needed, is
+  rebuildable from it. The `v_*_current` views are simplified to read `state`
+  directly and `meta.v_endpoint_latest_run` is retired (state no longer needs to
+  pick a run, and `raw` is now freely prunable). Migration 008 heals existing
+  files, collapsing any accumulated snapshots to the latest per table.
 
 ### Fixed
 
