@@ -516,10 +516,11 @@ Backlog added 2026-07-22 (from a repo review — priority order):
     Implementation checklist: normalize → replace-per-endpoint; simplify v_*_current
     (+ likely a migration 008); parse `[retention]` in config.py; prune + CHECKPOINT
     hooked at end of `collect`; update the schema-contract test + add tests.
-- **Export leak re-check symmetry**. `export_redacted` (writer.py) re-verifies
-  no e-mail-shaped strings, but NOT known user LUIDs — while the write-time safety
-  net checks both. Close the asymmetry at the trust boundary: re-scan the export
-  for UUID-shaped known LUIDs too (reuse `_LUID_RE`). Small, defense-in-depth.
+- **Export leak re-check symmetry — DONE 2026-07-24.** `export_redacted` now
+  re-scans the export for UUID-shaped known user LUIDs (EXISTS over the source
+  `identity.map`), alongside the existing e-mail re-scan; both checks abort the
+  export and delete the file. Test `test_export_verification_blocks_luid_leak`;
+  verified live (real export passes with 0 LUIDs, no false positive).
 - **Live-data shape fragility** (the "NA" bug class). Scrubber/normalizers trust
   Tableau's live response shapes; some VDS sources were never verified live; tests
   are all mocked so they can't catch shape drift or sentinel values ("NA", ...).

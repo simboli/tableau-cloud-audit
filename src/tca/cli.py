@@ -863,7 +863,9 @@ def export(
             table.add_row(name, str(rows))
         console.print(table)
         console.print("[green]✓[/green] identity vault NOT exported — pseudonyms only")
-        console.print("[green]✓[/green] verified: no e-mail-shaped strings in the export")
+        console.print(
+            "[green]✓[/green] verified: no e-mail-shaped strings or known LUIDs in the export"
+        )
         console.print(f"[green]✓[/green] SHA-256 written to {checksum_path.name}:\n  {digest}")
         console.print(
             "[dim]The export is unencrypted plain DuckDB — open it with any DuckDB "

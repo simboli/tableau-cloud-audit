@@ -489,8 +489,10 @@ class PackageStore:
 
         This is the only artifact allowed to leave the client machine: it holds
         pseudonyms only, is plain DuckDB (inspectable by anyone), and is
-        verified before returning — an e-mail-shaped string anywhere in the
-        exported raw payloads aborts the export and deletes the file.
+        verified before returning — an e-mail-shaped string OR a known user LUID
+        anywhere in the exported raw payloads aborts the export and deletes the
+        file (the same two checks the write-time safety net runs, re-applied at
+        the trust boundary).
         """
         if dest.exists():
             raise StorageError(f"'{dest}' already exists — refusing to overwrite.")
@@ -517,7 +519,9 @@ class PackageStore:
             # the copy describes itself: it is not encrypted
             self.con.execute("UPDATE exp.meta.file_info SET is_encrypted = false")
 
-            # verification: no identity schema, no e-mail-shaped strings
+            # verification: no identity schema, no e-mail-shaped strings, no
+            # known user LUIDs — the same leak checks the write-time safety net
+            # runs, re-applied to the artifact that actually leaves.
             leftover = self.con.execute(
                 "SELECT count(*) FROM duckdb_tables() "
                 "WHERE database_name = 'exp' AND schema_name = 'identity'"
@@ -533,6 +537,19 @@ class PackageStore:
                 raise StorageError(
                     f"Export verification failed: {emails[0]} page(s) contain an "
                     "e-mail-shaped string. The export was NOT produced."
+                )
+            # UUID-shaped guard: a degenerate vault token (e.g. "NA") can never
+            # make this substring scan pathological — matches the safety net.
+            luids = self.con.execute(
+                "SELECT count(*) FROM exp.raw.api_responses r WHERE EXISTS ("
+                "  SELECT 1 FROM identity.map i "
+                "  WHERE length(i.user_luid) = 36 AND contains(r.payload::VARCHAR, i.user_luid))"
+            ).fetchone()
+            assert luids is not None
+            if int(luids[0]) > 0:
+                raise StorageError(
+                    f"Export verification failed: {luids[0]} page(s) contain a "
+                    "known user LUID. The export was NOT produced."
                 )
         except BaseException:
             self.con.execute("DETACH exp")

@@ -64,6 +64,11 @@ test). Schema versions are tracked independently in `meta.schema_migrations`.
 
 ### Changed
 
+- **Export leak re-check is now symmetric.** `tca export` already re-verified
+  that no e-mail-shaped strings survive in the shared copy; it now also re-scans
+  for UUID-shaped known user LUIDs (the same guard the write-time safety net
+  uses), so the trust boundary runs both leak checks, not just one. Defense in
+  depth — no leak was known.
 - **Typed `state` is now current-only (schema v0.8).** `normalize` used to keep
   one `state.*` snapshot **per run**, so the tables grew linearly with the
   number of runs. Each state table is now REPLACED per collect (a run that did

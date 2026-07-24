@@ -77,3 +77,17 @@ def test_export_verification_blocks_email_leak(tmp_path: Path) -> None:
         store.export_redacted(dest)
     assert not dest.exists()  # nothing left behind
     store.close()
+
+
+def test_export_verification_blocks_luid_leak(tmp_path: Path) -> None:
+    store = make_populated_store(tmp_path / "pkg.duckdb")
+    luid = "aa11bb22-0000-1111-2222-333344445555"
+    run_id = store.begin_run(modules=["rest_core"])
+    store.upsert_identity(run_id, luid)  # a UUID-shaped known LUID
+    # simulate a scrubber gap: the LUID survives in raw (e.g. inside a hyperlink)
+    store.write_response(run_id, "/x", {"items": [{"link": f"/users/{luid}"}]})
+    dest = tmp_path / "export.duckdb"
+    with pytest.raises(StorageError, match="known user LUID"):
+        store.export_redacted(dest)
+    assert not dest.exists()
+    store.close()
