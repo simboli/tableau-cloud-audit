@@ -157,6 +157,14 @@ def test_collect_end_to_end_then_summary_and_resolve(workdir: Path, httpx_mock: 
     assert result.exit_code == 0, result.output
     assert result.output.strip() == "ok"
 
+    result = runner.invoke(app, ["diagnostics"])
+    assert result.exit_code == 0, result.output
+    assert "safe to share" in result.output
+    assert "raw PII scan" in result.output
+    result = runner.invoke(app, ["diagnostics", "--format", "markdown"])
+    assert result.exit_code == 0, result.output
+    assert "## tca diagnostics" in result.output
+
     result = runner.invoke(app, ["resolve", "U-0001"])
     assert result.exit_code == 0, result.output
     assert "m.rossi@acme.it" in result.output
@@ -185,6 +193,33 @@ def test_runs_without_file(workdir: Path) -> None:
     result = runner.invoke(app, ["runs"])
     assert result.exit_code == 1
     assert "tca collect" in plain(result.output)
+
+
+def test_diagnostics_without_file(workdir: Path) -> None:
+    write_config(workdir)
+    result = runner.invoke(app, ["diagnostics"])
+    assert result.exit_code == 0, result.output  # degrades to environment-only
+    assert "absent" in result.output
+
+
+def test_diagnostics_scrubs_pii_from_notes(workdir: Path) -> None:
+    from tca.storage.writer import PackageStore
+
+    write_config(workdir)
+    luid = "aa11bb22-0000-1111-2222-333344445555"
+    with PackageStore(workdir / "acme.duckdb") as store:
+        store.init_file_info("luid-1", "acme", "10ax")
+        rid = store.begin_run(modules=["rest_core"])
+        store.upsert_identity(rid, luid)  # now a known LUID
+        store.write_response(rid, "/users", {"a": 1})
+        store.finish_run(rid, "partial", notes=f"crash contacting mario.rossi@acme.it at {luid}")
+
+    result = runner.invoke(app, ["diagnostics"])
+    assert result.exit_code == 0, result.output
+    assert "mario.rossi@acme.it" not in result.output
+    assert luid not in result.output
+    assert "[redacted-email]" in result.output
+    assert "[redacted-luid]" in result.output
 
 
 def test_export_after_collect(workdir: Path, httpx_mock: HTTPXMock) -> None:

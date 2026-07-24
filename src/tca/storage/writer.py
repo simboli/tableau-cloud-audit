@@ -625,3 +625,75 @@ class PackageStore:
             )
             self.con.execute("CHECKPOINT")
         return int(deleted[0])
+
+    def diagnostics(self, run_limit: int = 5) -> dict[str, Any]:
+        """Offline, share-safe facts about this package file for ``tca
+        diagnostics``: schema, a scale profile (per-table row counts), applied
+        migrations, an independent PII self-scan over raw, and the last few runs.
+
+        Everything here is aggregate; the only free text is the runs' notes,
+        which the caller redacts before display.
+        """
+        info = self.con.execute("SELECT * FROM meta.file_info").fetchone()
+        counts = self.con.execute(
+            """
+            SELECT
+              (SELECT count(*) FROM meta.collection_runs)  AS runs,
+              (SELECT count(*) FROM raw.api_responses)     AS response_pages,
+              (SELECT count(*) FROM identity.map)          AS known_users,
+              (SELECT count(*) FROM history.events)        AS events,
+              (SELECT min(event_date) FROM history.events) AS events_from,
+              (SELECT max(event_date) FROM history.events) AS events_to,
+              (SELECT count(*) FROM meta.v_event_gaps)     AS coverage_gaps,
+              (SELECT count(*) FROM history.job_runs)      AS job_runs
+            """
+        ).fetchone()
+        assert counts is not None
+        state_tables = [
+            r[0]
+            for r in self.con.execute(
+                "SELECT table_name FROM duckdb_tables() "
+                "WHERE database_name = ? AND schema_name = 'state' ORDER BY table_name",
+                [_CATALOG],
+            ).fetchall()
+        ]
+        state_counts: dict[str, int] = {}
+        for table in state_tables:
+            row = self.con.execute(f'SELECT count(*) FROM state."{table}"').fetchone()
+            assert row is not None
+            state_counts[table] = int(row[0])
+        migrations = [
+            r[0]
+            for r in self.con.execute(
+                "SELECT version FROM meta.schema_migrations ORDER BY version"
+            ).fetchall()
+        ]
+        # independent PII self-scan over raw — doubles as an integrity signal
+        email_hits = self.con.execute(
+            r"SELECT count(*) FROM raw.api_responses "
+            r"WHERE regexp_matches(payload::VARCHAR, "
+            r"'[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}')"
+        ).fetchone()
+        luid_hits = self.con.execute(
+            "SELECT count(*) FROM raw.api_responses r WHERE EXISTS ("
+            "  SELECT 1 FROM identity.map i "
+            "  WHERE length(i.user_luid) = 36 AND contains(r.payload::VARCHAR, i.user_luid))"
+        ).fetchone()
+        assert email_hits is not None and luid_hits is not None
+        return {
+            "schema_version": info[4] if info else None,
+            "is_encrypted": info[5] if info else None,
+            "runs": counts[0],
+            "response_pages": counts[1],
+            "known_users": counts[2],
+            "events": counts[3],
+            "events_from": counts[4],
+            "events_to": counts[5],
+            "coverage_gaps": counts[6],
+            "job_runs": counts[7],
+            "state_counts": state_counts,
+            "migrations": migrations,
+            "raw_email_hits": int(email_hits[0]),
+            "raw_luid_hits": int(luid_hits[0]),
+            "last_runs": self.runs(run_limit),
+        }

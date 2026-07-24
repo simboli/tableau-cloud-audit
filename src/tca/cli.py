@@ -1,18 +1,22 @@
 """The `tca` command-line interface.
 
-Five commands: init, verify, collect, summary, resolve. Secrets come from
-environment variables only (TCA_PAT_SECRET, TCA_DB_KEY) — never from files,
-never from flags.
+Commands: init, verify, collect, summary, runs, diagnostics, peek, resolve,
+export. Secrets come from environment variables only (TCA_PAT_SECRET,
+TCA_DB_KEY) — never from files, never from flags.
 """
 
 from __future__ import annotations
 
 import hashlib
+import json
+import sys
 import time
 from collections.abc import Iterator, Sequence
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
+import duckdb
 import typer
 from rich.console import Console
 from rich.panel import Panel
@@ -43,7 +47,7 @@ from tca.modules.metadata import MetadataModule  # noqa: F401  (registers itself
 from tca.modules.permissions import PermissionsModule  # noqa: F401  (registers itself)
 from tca.modules.rest_core import RestCoreModule  # noqa: F401  (registers itself)
 from tca.normalize import normalize_run
-from tca.pseudo.scrubber import Scrubber, ScrubError
+from tca.pseudo.scrubber import Scrubber, ScrubError, redact_pii
 from tca.sources.metadata import MetadataApi
 from tca.sources.rest import TableauRest
 from tca.sources.vds import VizqlDataService
@@ -567,6 +571,245 @@ def runs(
             console.print(table)
             for run_id, note in notes:
                 console.print(f"[dim]run #{run_id}: {note}[/dim]")
+    except _USER_ERRORS as exc:
+        raise _fail(str(exc)) from exc
+
+
+# ---------------------------------------------------------------- diagnostics
+
+
+class DiagFormat(StrEnum):
+    text = "text"
+    markdown = "markdown"
+    json = "json"
+
+
+_DIAG_BANNER = "tca diagnostics — safe to share (no names, e-mails, LUIDs or site identity)"
+
+
+def _fmt_size(n: int | None) -> str:
+    if n is None:
+        return "—"
+    mb = n / (1024 * 1024)
+    return f"{mb:.1f} MB" if mb >= 1 else f"{n / 1024:.0f} KB"
+
+
+def _diagnostics_report(
+    cfg: Config, data: dict[str, Any] | None, file_size: int | None, known: list[str]
+) -> dict[str, Any]:
+    """Assemble the share-safe diagnostics as a plain serializable dict. Run
+    notes (the only free text) are scrubbed; site name, pod and PAT name are
+    omitted by design (they identify the organisation)."""
+    env: dict[str, Any] = {
+        "tca": __version__,
+        "python": sys.version.split()[0],
+        "duckdb": duckdb.__version__,
+        "platform": sys.platform,
+    }
+    report: dict[str, Any] = {"environment": env}
+    if data is None:
+        report["package_file"] = "absent — run `tca collect` first"
+        report["config"] = {"retention_raw_days": cfg.retention.raw_days}
+        return report
+
+    env["schema"] = f"v{data['schema_version']}"
+    env["encrypted"] = bool(data["is_encrypted"])
+    runs_out: list[dict[str, Any]] = []
+    for run_id, status, started, finished, modules, note, pages in data["last_runs"]:
+        runs_out.append(
+            {
+                "run": run_id,
+                "status": status,
+                "duration": _fmt_duration(started, finished),
+                "pages": pages,
+                "modules": list(modules or []),
+                "note": redact_pii(note, known) if note else None,
+            }
+        )
+    report["scale"] = {
+        "runs": data["runs"],
+        "raw_pages": data["response_pages"],
+        "identity_vault": data["known_users"],
+        "file_size_bytes": file_size,
+        "history_events": data["events"],
+        "history_window": [str(data["events_from"]), str(data["events_to"])]
+        if data["events"]
+        else None,
+        "coverage_gaps": data["coverage_gaps"],
+        "job_runs": data["job_runs"],
+        "state": data["state_counts"],
+    }
+    report["runs"] = runs_out
+    report["config"] = {
+        "retention_raw_days": cfg.retention.raw_days,
+        "last_run_modules": runs_out[0]["modules"] if runs_out else [],
+    }
+    report["integrity"] = {
+        "migrations": data["migrations"],
+        "raw_email_hits": data["raw_email_hits"],
+        "raw_luid_hits": data["raw_luid_hits"],
+    }
+    return report
+
+
+def _integrity_mark(integrity: dict[str, Any]) -> str:
+    clean = not (integrity["raw_email_hits"] or integrity["raw_luid_hits"])
+    return "✓" if clean else "⚠"
+
+
+def _render_diag_text(r: dict[str, Any]) -> str:
+    e = r["environment"]
+    env_line = f"tca {e['tca']} · python {e['python']} · duckdb {e['duckdb']} · {e['platform']}"
+    if "schema" in e:
+        env_line += f" · schema {e['schema']} · encrypted: {e['encrypted']}"
+    lines = [_DIAG_BANNER, "", "Environment", f"  {env_line}", ""]
+    if "scale" not in r:
+        lines += [
+            f"Package file: {r['package_file']}",
+            f"Config: retention raw_days={r['config']['retention_raw_days']}",
+        ]
+        return "\n".join(lines)
+
+    s = r["scale"]
+    state_bits = " · ".join(f"{t.split('.')[-1]} {c}" for t, c in s["state"].items() if c)
+    hist = f"  history.events {s['history_events']}"
+    if s["history_window"]:
+        win = s["history_window"]
+        hist += f"  (window {win[0]} → {win[1]}, gaps: {s['coverage_gaps']})"
+    lines += [
+        "Scale profile",
+        f"  runs {s['runs']} · raw pages {s['raw_pages']} · identity vault "
+        f"{s['identity_vault']} · file size {_fmt_size(s['file_size_bytes'])}",
+        hist,
+        f"  state: {state_bits}",
+        "",
+        f"Runs (last {len(r['runs'])})",
+    ]
+    for run in r["runs"]:
+        lines.append(
+            f"  #{run['run']} {run['status']} {run['duration']} {run['pages']}p "
+            f"[{', '.join(run['modules'])}]"
+        )
+        if run["note"]:
+            lines.append(f"       note: {run['note']}")
+    c = r["config"]
+    i = r["integrity"]
+    mods = ", ".join(c["last_run_modules"])
+    lines += [
+        "",
+        "Config",
+        f"  modules: {mods} · retention: raw_days={c['retention_raw_days']}",
+        "  (site name, pod, PAT name omitted by design)",
+        "",
+        "Integrity",
+        f"  migrations {i['migrations'][0]} … {i['migrations'][-1]}",
+        f"  raw PII scan: {i['raw_email_hits']} e-mail-shaped, {i['raw_luid_hits']} known LUIDs  "
+        f"{_integrity_mark(i)}",
+    ]
+    return "\n".join(lines)
+
+
+def _render_diag_markdown(r: dict[str, Any]) -> str:
+    e = r["environment"]
+    env_line = f"tca {e['tca']} · python {e['python']} · duckdb {e['duckdb']} · {e['platform']}"
+    if "schema" in e:
+        env_line += f" · schema {e['schema']} · encrypted: {e['encrypted']}"
+    lines = [
+        "## tca diagnostics",
+        "_Safe to share — no names, e-mails, LUIDs or site identity._",
+        "",
+        f"**Environment:** {env_line}",
+    ]
+    if "scale" not in r:
+        lines += [
+            "",
+            f"**Package file:** {r['package_file']}",
+            f"**Config:** retention raw_days={r['config']['retention_raw_days']}",
+        ]
+        return "\n".join(lines)
+
+    s = r["scale"]
+    state_bits = " · ".join(f"{t.split('.')[-1]} {c}" for t, c in s["state"].items() if c)
+    window = (
+        f" (window {s['history_window'][0]} → {s['history_window'][1]}, gaps: {s['coverage_gaps']})"
+        if s["history_window"]
+        else ""
+    )
+    c = r["config"]
+    i = r["integrity"]
+    lines += [
+        "",
+        "**Scale profile**",
+        f"- runs: {s['runs']} · raw pages: {s['raw_pages']} · identity vault: "
+        f"{s['identity_vault']} · file size: {_fmt_size(s['file_size_bytes'])}",
+        f"- history.events: {s['history_events']}{window}",
+        f"- state: {state_bits}",
+        "",
+        "**Runs**",
+        "",
+        "| run | status | duration | pages | modules |",
+        "| --- | --- | --- | --- | --- |",
+    ]
+    for run in r["runs"]:
+        note = f" — {run['note']}" if run["note"] else ""
+        lines.append(
+            f"| {run['run']} | {run['status']}{note} | {run['duration']} | "
+            f"{run['pages']} | {', '.join(run['modules'])} |"
+        )
+    mods = ", ".join(c["last_run_modules"])
+    scan = f"{i['raw_email_hits']} e-mails, {i['raw_luid_hits']} LUIDs {_integrity_mark(i)}"
+    lines += [
+        "",
+        f"**Config:** modules {mods} · retention raw_days={c['retention_raw_days']} "
+        "(site/pod/PAT omitted)",
+        "",
+        f"**Integrity:** migrations {i['migrations'][0]}…{i['migrations'][-1]} · "
+        f"raw PII scan {scan}",
+    ]
+    return "\n".join(lines)
+
+
+@app.command()
+def diagnostics(
+    config: Path = CONFIG_OPTION,
+    fmt: DiagFormat = typer.Option(
+        DiagFormat.text, "--format", "-f", help="Output format: text | markdown | json."
+    ),
+    output: Path | None = typer.Option(
+        None, "--output", "-o", help="Write to a file instead of stdout."
+    ),
+) -> None:
+    """Print a PII-free health & scale report, safe to paste into a bug report.
+
+    Reads the package file only (no network): versions, run history, per-table
+    row counts and integrity signals — never names, e-mails, LUIDs or your site
+    identity. Run notes are scrubbed and the whole report passes a final PII
+    self-gate before it is emitted. `--format markdown` is ready for a GitHub
+    issue.
+    """
+    try:
+        cfg = Config.load(config)
+        data: dict[str, Any] | None = None
+        file_size: int | None = None
+        known: list[str] = []
+        if cfg.database_path.exists():
+            file_size = cfg.database_path.stat().st_size
+            with PackageStore(cfg.database_path, db_key()) as store:
+                data = store.diagnostics()
+                known = list(store.known_luids())
+        report = _diagnostics_report(cfg, data, file_size, known)
+        if fmt is DiagFormat.json:
+            text = json.dumps(report, indent=2, default=str)
+        elif fmt is DiagFormat.markdown:
+            text = _render_diag_markdown(report)
+        else:
+            text = _render_diag_text(report)
+        text = redact_pii(text, known)  # final self-gate: never emit PII, whatever the source
+        if output is not None:
+            output.write_text(text + "\n", encoding="utf-8")
+            console.print(f"[green]✓[/green] wrote diagnostics to {output}")
+        else:
+            typer.echo(text)
     except _USER_ERRORS as exc:
         raise _fail(str(exc)) from exc
 

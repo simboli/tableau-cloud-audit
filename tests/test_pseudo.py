@@ -192,6 +192,17 @@ def test_vds_na_luid_is_not_a_user(store: PackageStore, scrubber: Scrubber) -> N
     assert "NA" not in store.known_luids()  # vault never poisoned
 
 
+def test_redact_pii_helper() -> None:
+    from tca.pseudo.scrubber import redact_pii
+
+    luid = "aa11bb22-0000-1111-2222-333344445555"
+    text = f"error for mario@acme.it at {luid} (site role NA)"
+    out = redact_pii(text, [luid, "NA"])
+    assert "mario@acme.it" not in out and "[redacted-email]" in out
+    assert luid not in out and "[redacted-luid]" in out
+    assert "NA" in out  # degenerate non-UUID token left alone — no pathological redaction
+
+
 def test_connection_username_is_redacted(scrubber: Scrubber) -> None:
     payload = {
         "connections": {

@@ -15,7 +15,7 @@ from __future__ import annotations
 import copy
 import json
 import re
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from typing import Any
 
 from tca.pseudo.manifest import (
@@ -36,6 +36,20 @@ _EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 _LUID_RE = re.compile(
     r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
 )
+
+
+def redact_pii(text: str, known_luids: Iterable[str]) -> str:
+    """Redact e-mail-shaped strings and UUID-shaped known user LUIDs from free
+    text (run notes, error messages) so it is safe to share — e.g. in
+    ``tca diagnostics``. The same defences the safety net uses, applied to text
+    instead of a payload; belt-and-suspenders when passed over already-aggregate
+    output (a no-op unless something leaked)."""
+    redacted = _EMAIL_RE.sub("[redacted-email]", text)
+    for luid in known_luids:
+        if _LUID_RE.fullmatch(luid):
+            redacted = redacted.replace(luid, "[redacted-luid]")
+    return redacted
+
 
 # Admin Insights uses the literal string "NA" in a LUID column when the row has
 # no user (e.g. a group grantee in the Permissions datasource). It is NOT a user

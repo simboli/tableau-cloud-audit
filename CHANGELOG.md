@@ -49,6 +49,13 @@ test). Schema versions are tracked independently in `meta.schema_migrations`.
   -q` prints just the last run's status (machine-readable), so a scheduled
   pipeline can branch on it — e.g. resume a `partial` run instead of starting
   a fresh one.
+- **`tca diagnostics`** — a PII-free health & scale report, safe to paste into a
+  bug report. Offline (reads the package file only): versions, run history,
+  per-table row counts, applied migrations and an independent raw PII self-scan —
+  never names, e-mails, LUIDs or site identity. Run notes are scrubbed and the
+  whole report passes a final PII self-gate before it is emitted. `--format
+  text|markdown|json` (markdown is ready for a GitHub issue) and `-o` to write a
+  file. Turns "it doesn't work" into a shareable, debuggable report.
 - **`[retention] raw_days` in `collector.toml`** — bounds disk use. At the end
   of each collect, raw pages of runs older than `raw_days` are pruned (the run
   just collected is always kept), then a `CHECKPOINT` reclaims the bytes.
