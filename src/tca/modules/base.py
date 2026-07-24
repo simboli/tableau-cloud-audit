@@ -19,6 +19,18 @@ from tca.sources.rest import TableauRest
 from tca.sources.vds import VizqlDataService
 from tca.storage.writer import PackageStore
 
+# The module set that runs when neither --modules nor [collect] modules is given.
+# Single source of truth for the default selection (the CLI option and the config
+# fall back here). Dependency ordering is applied later by resolve_modules.
+DEFAULT_MODULES: tuple[str, ...] = (
+    "rest_core",
+    "content",
+    "automation",
+    "permissions",
+    "activity",
+    "metadata",
+)
+
 
 def _passthrough_track(items: Sequence[Any], label: str) -> Iterable[Any]:
     return items

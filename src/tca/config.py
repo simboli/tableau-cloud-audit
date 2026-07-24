@@ -45,6 +45,32 @@ class RetentionConfig(BaseModel):
         return value
 
 
+class CollectConfig(BaseModel):
+    """Optional [collect] table in collector.toml.
+
+    `modules` sets the default module selection as an *exact* list (these and
+    only these run when `tca collect` gets no `--modules` flag). Absent → the
+    built-in default set (`modules.base.DEFAULT_MODULES`). Precedence at collect
+    time: `--modules` flag > `[collect] modules` > default set. Module names are
+    validated when the run resolves them, so a typo fails loudly there with the
+    list of available modules — this layer only guarantees a non-empty list.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    modules: list[str] | None = None
+
+    @field_validator("modules")
+    @classmethod
+    def _non_empty(cls, value: list[str] | None) -> list[str] | None:
+        if value is None:
+            return value
+        cleaned = [m.strip() for m in value if m.strip()]
+        if not cleaned:
+            raise ValueError("modules, if set, must list at least one module name")
+        return cleaned
+
+
 class Config(BaseModel):
     model_config = ConfigDict(extra="forbid")  # typos in collector.toml fail loudly
 
@@ -53,6 +79,7 @@ class Config(BaseModel):
     pat_name: str
     database: str
     retention: RetentionConfig = Field(default_factory=RetentionConfig)
+    collect: CollectConfig = Field(default_factory=CollectConfig)
 
     # set by load(); not part of the TOML
     _config_dir: Path = Path(".")

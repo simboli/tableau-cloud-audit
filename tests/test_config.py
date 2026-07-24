@@ -1,4 +1,4 @@
-"""Config loading: collector.toml + the optional [retention] table."""
+"""Config loading: collector.toml + the optional [retention]/[collect] tables."""
 
 from pathlib import Path
 
@@ -33,3 +33,23 @@ def test_retention_negative_is_rejected(tmp_path: Path) -> None:
 def test_unknown_retention_key_is_rejected(tmp_path: Path) -> None:
     with pytest.raises(ConfigError):
         Config.load(_write(tmp_path, BASE + "\n[retention]\nkeep_forever = true\n"))
+
+
+def test_collect_modules_defaults_to_none(tmp_path: Path) -> None:
+    cfg = Config.load(_write(tmp_path, BASE))
+    assert cfg.collect.modules is None  # absent → CLI falls back to DEFAULT_MODULES
+
+
+def test_collect_modules_explicit_list(tmp_path: Path) -> None:
+    cfg = Config.load(_write(tmp_path, BASE + '\n[collect]\nmodules = ["rest_core", "content"]\n'))
+    assert cfg.collect.modules == ["rest_core", "content"]
+
+
+def test_collect_empty_modules_list_is_rejected(tmp_path: Path) -> None:
+    with pytest.raises(ConfigError):
+        Config.load(_write(tmp_path, BASE + "\n[collect]\nmodules = []\n"))
+
+
+def test_unknown_collect_key_is_rejected(tmp_path: Path) -> None:
+    with pytest.raises(ConfigError):
+        Config.load(_write(tmp_path, BASE + '\n[collect]\nextra = "x"\n'))

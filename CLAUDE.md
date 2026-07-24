@@ -216,9 +216,21 @@ site = "acme-industries"
 pod = "eu-west"
 pat_name = "tabhealth-collector"
 database = "acme-industries.duckdb"   # user-chosen; path relative to config file, or absolute
+
+[retention]                           # optional
+raw_days = 0                          # 0 = keep raw forever; N = prune raw pages older than N days
+
+[collect]                             # optional
+modules = ["rest_core", "content", "permissions"]  # exact list; absent = full default set
 ```
 
 The PAT **secret** is never in this file — env var only.
+
+`[collect] modules` is an **exact list** (these and only these), not an
+enable/disable diff. Module selection precedence at collect time:
+`--modules` flag > `[collect] modules` > built-in `DEFAULT_MODULES`
+(`modules/base.py`, the single source of truth). The `--modules` option default
+is `None` so the three levels stay distinguishable; an empty selection fails loud.
 
 **Env vars** (aligned with the `tca` CLI name; the docs' `TABHEALTH_*` names are superseded):
 - `TCA_PAT_SECRET` — the PAT secret (required for `collect`/`verify`)

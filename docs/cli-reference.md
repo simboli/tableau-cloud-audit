@@ -50,7 +50,7 @@ interrupted run loses nothing.
 
 | Option | Effect |
 |---|---|
-| `--modules/-m LIST` | Comma-separated module list. Default: `rest_core,content,automation,permissions,activity,metadata` |
+| `--modules/-m LIST` | Comma-separated module list. Overrides `[collect] modules` in the config; if neither is set, the full default set runs: `rest_core,content,automation,permissions,activity,metadata` |
 | `--resume` | Continue the most recent interrupted run instead of starting a new one |
 
 Modules:

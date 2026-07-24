@@ -181,6 +181,45 @@ def test_collect_unknown_module(workdir: Path) -> None:
     assert "Unknown module" in plain(result.output)
 
 
+def _append_collect_section(tmp_path: Path, modules_list: str) -> None:
+    path = tmp_path / "collector.toml"
+    path.write_text(path.read_text() + f"\n[collect]\nmodules = {modules_list}\n")
+
+
+def test_collect_uses_config_modules_without_flag(workdir: Path, httpx_mock: HTTPXMock) -> None:
+    # [collect] modules picks rest_core; no --modules flag → the config wins.
+    write_config(workdir)
+    _append_collect_section(workdir, '["rest_core"]')
+    mock_signin(httpx_mock)
+    mock_collect_endpoints(httpx_mock)
+
+    result = runner.invoke(app, ["collect"])
+    assert result.exit_code == 0, result.output
+    assert "run #1" in plain(result.output)
+    assert "/users — page 1" in plain(result.output)  # rest_core ran
+
+
+def test_collect_flag_overrides_config_modules(workdir: Path, httpx_mock: HTTPXMock) -> None:
+    # config names a bogus module; the --modules flag must win, so the run works.
+    write_config(workdir)
+    _append_collect_section(workdir, '["does-not-exist"]')
+    mock_signin(httpx_mock)
+    mock_collect_endpoints(httpx_mock)
+
+    result = runner.invoke(app, ["collect", "--modules", "rest_core"])
+    assert result.exit_code == 0, result.output
+    assert "/users — page 1" in plain(result.output)
+
+
+def test_collect_config_unknown_module_fails(workdir: Path) -> None:
+    # no flag → the bogus config module is resolved and fails loudly (before signin).
+    write_config(workdir)
+    _append_collect_section(workdir, '["nope"]')
+    result = runner.invoke(app, ["collect"])
+    assert result.exit_code == 1
+    assert "Unknown module" in plain(result.output)
+
+
 def test_summary_without_file(workdir: Path) -> None:
     write_config(workdir)
     result = runner.invoke(app, ["summary"])

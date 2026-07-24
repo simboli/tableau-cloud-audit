@@ -262,11 +262,12 @@ def _verify_metadata_api(client: RestClient) -> None:
 @app.command()
 def collect(
     config: Path = CONFIG_OPTION,
-    modules: str = typer.Option(
-        "rest_core,content,automation,permissions,activity,metadata",
+    modules: str | None = typer.Option(
+        None,
         "--modules",
         "-m",
-        help="Comma-separated module names.",
+        help="Comma-separated module names. Overrides [collect] modules in the "
+        "config; if neither is set, the full default module set runs.",
     ),
     resume: bool = typer.Option(
         False, "--resume", help="Continue the last interrupted run instead of starting a new one."
@@ -283,9 +284,16 @@ def collect(
         secret = pat_secret()
         key = db_key()
         _warn_if_unencrypted(key)
-        selected = modules_base.resolve_modules(
-            [m.strip() for m in modules.split(",") if m.strip()]
-        )
+        # Precedence: --modules flag > [collect] modules > built-in default set.
+        if modules is not None:
+            names = [m.strip() for m in modules.split(",") if m.strip()]
+        elif cfg.collect.modules is not None:
+            names = cfg.collect.modules
+        else:
+            names = list(modules_base.DEFAULT_MODULES)
+        if not names:
+            raise _fail("No modules selected: --modules resolved to an empty list.")
+        selected = modules_base.resolve_modules(names)
 
         client = RestClient(Credentials.build(cfg.pod, cfg.site, cfg.pat_name, secret))
         try:
