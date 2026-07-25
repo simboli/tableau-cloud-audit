@@ -1,0 +1,85 @@
+name: Bug report
+description: Something went wrong or behaved unexpectedly.
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! A few structured details make bugs much quicker to fix.
+
+        **Privacy:** the safest way to hand us context is `tca diagnostics --markdown` —
+        PII-free by design. If you paste an error or traceback, glance over it first and
+        redact anything site-specific: the collector masks the PAT and pseudonymises
+        identities, but a raw Python traceback can still echo payload fragments.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: A clear description of the bug — what you expected versus what actually happened.
+      placeholder: "tca collect crashed on the permissions module; I expected it to finish or skip the item."
+    validations:
+      required: true
+  - type: dropdown
+    id: command
+    attributes:
+      label: Which command?
+      options:
+        - init
+        - verify
+        - collect
+        - summary
+        - runs
+        - diagnostics
+        - peek
+        - resolve
+        - export
+        - other / not sure
+    validations:
+      required: false
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: What you ran, in order — the exact command(s), but NEVER the PAT secret.
+      placeholder: |
+        1. tca collect
+        2. ...
+      render: shell
+    validations:
+      required: false
+  - type: textarea
+    id: error
+    attributes:
+      label: Error output / traceback
+      description: Paste the message or traceback. Redact anything site-specific first.
+      render: text
+    validations:
+      required: false
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: "`tca diagnostics --markdown` output"
+      description: Run `tca diagnostics --markdown` and paste it — PII-free by design; gives us versions + scale at a glance.
+      placeholder: |
+        ## tca diagnostics
+        _Safe to share — no names, e-mails, LUIDs or site identity._
+        ...
+      render: markdown
+    validations:
+      required: false
+  - type: input
+    id: version
+    attributes:
+      label: Collector version
+      description: From `tca --version` (skip if you pasted the diagnostics output above).
+      placeholder: "0.1.0"
+    validations:
+      required: false
+  - type: checkboxes
+    id: privacy-ack
+    attributes:
+      label: Privacy check
+      options:
+        - label: I've reviewed what I'm pasting — it contains no real names, e-mails, user LUIDs or my PAT secret.
+          required: true

@@ -545,10 +545,12 @@ Backlog added 2026-07-22 (from a repo review — priority order):
        expensive path (per-item permission calls, real pagination, rate limits)
        without needing new users (watch storage/seat limits).
     3. Real large site → later, with a consenting pilot client.
-- **Scale-report issue template — DONE 2026-07-24.** `.github/ISSUE_TEMPLATE/`:
-  a `scale_report.yml` issue form that pairs with `tca diagnostics --markdown`
-  (paste the PII-free report + outcome + rough scale + observations + a privacy
-  ack), plus a `config.yml` keeping blank issues enabled and pointing security
-  reports to SECURITY.md. Turns the OSS-feedback hope into a low-effort, safe
-  channel (see the scale/feedback discussion). A general bug-report template is
-  a possible future addition — blank issues stay enabled meanwhile.
+- **Issue templates — DONE 2026-07-24/25.** `.github/ISSUE_TEMPLATE/`:
+  `scale_report.yml` (pairs with `tca diagnostics --markdown`: PII-free report +
+  outcome + rough scale + observations + privacy ack) and `bug_report.yml`
+  (what happened + command + repro + error + the same diagnostics paste + privacy
+  ack), plus `config.yml` keeping blank issues enabled and routing security
+  reports to SECURITY.md. Both forms lead with `tca diagnostics --markdown` so
+  reports arrive with PII-free context. Turns the OSS-feedback hope into a
+  low-effort, safe channel (see the scale/feedback discussion). Labels
+  `scale-report`/`bug` exist in the repo.
