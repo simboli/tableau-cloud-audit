@@ -1,0 +1,69 @@
+name: Scale report
+description: Tell us how the collector ran on your Tableau Cloud site — size, timing, anything that broke.
+title: "[scale] "
+labels: ["scale-report"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for running **tableau-cloud-audit** on a real site! Reports from larger
+        estates are how we harden it beyond the tiny dev sandbox it is built on.
+
+        **Privacy first — the easy way to share numbers is `tca diagnostics --markdown`.**
+        Its output is PII-free *by construction*: no names, e-mails, LUIDs or your site
+        identity, and it passes a final self-gate before printing. Paste it below and you
+        are done. (Prefer not to? Skip it and just fill in the rough scale.)
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: "`tca diagnostics --markdown` output"
+      description: Run `tca diagnostics --markdown` and paste the whole report here.
+      placeholder: |
+        ## tca diagnostics
+        _Safe to share — no names, e-mails, LUIDs or site identity._
+        ...
+      render: markdown
+    validations:
+      required: false
+  - type: dropdown
+    id: outcome
+    attributes:
+      label: Did the collection complete?
+      options:
+        - "Yes — tca collect finished (status ok)"
+        - "Partial — it stopped and was resumable"
+        - "No — it failed"
+        - "Haven't run a full collect yet"
+    validations:
+      required: true
+  - type: input
+    id: scale
+    attributes:
+      label: Rough site scale
+      description: Ballpark is fine — useful especially if you skipped the diagnostics output.
+      placeholder: "~4000 workbooks, ~600 datasources, ~1500 users, ~200 projects"
+    validations:
+      required: false
+  - type: textarea
+    id: observations
+    attributes:
+      label: What happened
+      description: Timing, memory, rate-limiting, errors — anything that felt slow or broke. Which module was the slow/failing one, if you noticed.
+      placeholder: "collect took ~40 min; the permissions module dominated; one 429 backoff; ..."
+    validations:
+      required: false
+  - type: input
+    id: version
+    attributes:
+      label: Collector version
+      description: From `tca --version` (also shown in the diagnostics output).
+      placeholder: "0.1.0"
+    validations:
+      required: false
+  - type: checkboxes
+    id: privacy-ack
+    attributes:
+      label: Privacy check
+      options:
+        - label: I've reviewed what I'm pasting — it contains no real names, e-mails or user LUIDs. (The `tca diagnostics` output is safe by design; this only matters for any free text I added myself.)
+          required: true
