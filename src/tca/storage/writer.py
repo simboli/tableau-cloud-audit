@@ -98,6 +98,18 @@ def _now() -> datetime:
     return datetime.now(UTC).replace(tzinfo=None)
 
 
+def _sql_literal(value: str) -> str:
+    """Escape a string for safe inlining as a single-quoted SQL literal.
+
+    ATTACH accepts no bound parameters for its path or its options, so the file
+    path, the export destination and the encryption key are all inlined — each
+    must be escaped. A lone apostrophe (common in macOS paths, e.g.
+    ``/Users/O'Brien/...``) would otherwise break the statement or let SQL be
+    injected through a crafted path.
+    """
+    return value.replace("'", "''")
+
+
 class PackageStore:
     """Owns the connection to one package file.
 
@@ -121,10 +133,10 @@ class PackageStore:
         con = duckdb.connect()
         options = ""
         if self._key is not None:
-            escaped = self._key.replace("'", "''")
-            options = f" (ENCRYPTION_KEY '{escaped}')"
+            options = f" (ENCRYPTION_KEY '{_sql_literal(self._key)}')"
+        attach_path = _sql_literal(self.path.as_posix())
         try:
-            con.execute(f"ATTACH '{self.path.as_posix()}' AS {_CATALOG}{options}")
+            con.execute(f"ATTACH '{attach_path}' AS {_CATALOG}{options}")
         except duckdb.CatalogException as exc:
             if "without a key" in str(exc):
                 raise StorageError(
@@ -484,6 +496,38 @@ class PackageStore:
         ("state.v_permission_rules_current", "SELECT * FROM state.permission_rules"),
     )
 
+    def _assert_export_table_clean(self, schema: str, table: str) -> None:
+        """Abort if an exported table holds an e-mail-shaped string or a known
+        user LUID. ``to_json(t)`` serialises the whole row — every column, nested
+        JSON payloads included — so the scan covers all fields, not just raw."""
+        qualified = f'exp."{schema}"."{table}" t'
+        emails = self.con.execute(
+            f"SELECT count(*) FROM {qualified} "
+            r"WHERE regexp_matches(to_json(t)::VARCHAR, "
+            r"'[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}')"
+        ).fetchone()
+        assert emails is not None
+        if int(emails[0]) > 0:
+            raise StorageError(
+                f"Export verification failed: {emails[0]} row(s) in "
+                f"'{schema}.{table}' contain an e-mail-shaped string. "
+                "The export was NOT produced."
+            )
+        # UUID-shaped guard: a degenerate vault token (e.g. "NA") can never make
+        # this substring scan pathological — matches the safety net.
+        luids = self.con.execute(
+            f"SELECT count(*) FROM {qualified} WHERE EXISTS ("
+            "  SELECT 1 FROM identity.map i "
+            "  WHERE length(i.user_luid) = 36 AND contains(to_json(t)::VARCHAR, i.user_luid))"
+        ).fetchone()
+        assert luids is not None
+        if int(luids[0]) > 0:
+            raise StorageError(
+                f"Export verification failed: {luids[0]} row(s) in "
+                f"'{schema}.{table}' contain a known user LUID. "
+                "The export was NOT produced."
+            )
+
     def export_redacted(self, dest: Path) -> dict[str, int]:
         """Copy every schema EXCEPT ``identity`` into a new, unencrypted file.
 
@@ -496,7 +540,7 @@ class PackageStore:
         """
         if dest.exists():
             raise StorageError(f"'{dest}' already exists — refusing to overwrite.")
-        self.con.execute(f"ATTACH '{dest.as_posix()}' AS exp")
+        self.con.execute(f"ATTACH '{_sql_literal(dest.as_posix())}' AS exp")
         try:
             tables = self.con.execute(
                 f"""
@@ -519,38 +563,20 @@ class PackageStore:
             # the copy describes itself: it is not encrypted
             self.con.execute("UPDATE exp.meta.file_info SET is_encrypted = false")
 
-            # verification: no identity schema, no e-mail-shaped strings, no
-            # known user LUIDs — the same leak checks the write-time safety net
-            # runs, re-applied to the artifact that actually leaves.
+            # verification: no identity schema, and no e-mail-shaped strings or
+            # known user LUIDs anywhere in the exported data — the same leak
+            # checks the write-time safety net runs, re-applied at the trust
+            # boundary. Scanned over EVERY exported table, not just raw:
+            # history.* rows outlive their source raw pages once retention
+            # pruning runs, and meta.collection_runs.notes is free text, so a
+            # leak confined to those would slip past a raw-only scan.
             leftover = self.con.execute(
                 "SELECT count(*) FROM duckdb_tables() "
                 "WHERE database_name = 'exp' AND schema_name = 'identity'"
             ).fetchone()
             assert leftover is not None and int(leftover[0]) == 0
-            emails = self.con.execute(
-                r"SELECT count(*) FROM exp.raw.api_responses "
-                r"WHERE regexp_matches(payload::VARCHAR, "
-                r"'[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}')"
-            ).fetchone()
-            assert emails is not None
-            if int(emails[0]) > 0:
-                raise StorageError(
-                    f"Export verification failed: {emails[0]} page(s) contain an "
-                    "e-mail-shaped string. The export was NOT produced."
-                )
-            # UUID-shaped guard: a degenerate vault token (e.g. "NA") can never
-            # make this substring scan pathological — matches the safety net.
-            luids = self.con.execute(
-                "SELECT count(*) FROM exp.raw.api_responses r WHERE EXISTS ("
-                "  SELECT 1 FROM identity.map i "
-                "  WHERE length(i.user_luid) = 36 AND contains(r.payload::VARCHAR, i.user_luid))"
-            ).fetchone()
-            assert luids is not None
-            if int(luids[0]) > 0:
-                raise StorageError(
-                    f"Export verification failed: {luids[0]} page(s) contain a "
-                    "known user LUID. The export was NOT produced."
-                )
+            for schema, table in tables:
+                self._assert_export_table_clean(schema, table)
         except BaseException:
             self.con.execute("DETACH exp")
             dest.unlink(missing_ok=True)

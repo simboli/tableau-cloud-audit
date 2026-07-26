@@ -79,6 +79,20 @@ def test_export_verification_blocks_email_leak(tmp_path: Path) -> None:
     store.close()
 
 
+def test_export_verification_blocks_leak_outside_raw(tmp_path: Path) -> None:
+    """A leak confined to a non-raw table must still abort the export. Free-text
+    run notes (from str(exc)[:500]) travel in the export and, unlike their source
+    raw pages, are never pruned — so the scan must cover them too, not just raw."""
+    store = make_populated_store(tmp_path / "pkg.duckdb")
+    run_id = store.begin_run(modules=["rest_core"])
+    store.finish_run(run_id, "partial", notes="request failed for leak@acme.it")
+    dest = tmp_path / "export.duckdb"
+    with pytest.raises(StorageError, match="verification failed"):
+        store.export_redacted(dest)
+    assert not dest.exists()
+    store.close()
+
+
 def test_export_verification_blocks_luid_leak(tmp_path: Path) -> None:
     store = make_populated_store(tmp_path / "pkg.duckdb")
     luid = "aa11bb22-0000-1111-2222-333344445555"

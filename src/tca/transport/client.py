@@ -25,6 +25,10 @@ from tca.transport.auth import BOOTSTRAP_API_VERSION, Credentials, signin_body
 MAX_ATTEMPTS = 5
 BACKOFF_BASE_SECONDS = 1.0
 BACKOFF_CAP_SECONDS = 30.0
+# A server Retry-After is honoured but capped: an unbounded value from a
+# compromised or misbehaving intermediary must not stall the collector for
+# an arbitrarily long time. Generous enough for a legitimate rate-limit wait.
+RETRY_AFTER_CAP_SECONDS = 300.0
 PAGE_SIZE = 1000  # Tableau REST maximum
 
 
@@ -193,7 +197,7 @@ def _backoff_seconds(response: httpx.Response, attempt: int) -> float:
     retry_after = response.headers.get("Retry-After")
     if retry_after is not None:
         try:
-            return max(float(retry_after), 0.0)
+            return min(max(float(retry_after), 0.0), RETRY_AFTER_CAP_SECONDS)
         except ValueError:
             pass
     return min(BACKOFF_BASE_SECONDS * (2 ** (attempt - 1)), BACKOFF_CAP_SECONDS)
