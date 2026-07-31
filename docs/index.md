@@ -49,13 +49,13 @@ tca export            # the shareable copy: everything EXCEPT the identity vault
 
 ## Learn more
 
-- [Getting ready](getting-ready.md) — PAT, site name, Admin Insights, legal:
-  the kick-off checklist
+- [Getting started](getting-started.md) — PAT, site name, Admin Insights, the
+  full walkthrough and the kick-off checklist
 - [CLI reference](cli-reference.md) — all seven commands, options, exit codes
 - [What we collect](what-we-collect.md) — field-level transparency
 - [Package file schema](package-file-schema.md) — table-by-table guide for
   querying the file
-- [Query cookbook](cookbook.md) — starter recipes: inactive users, "All
+- [Query cookbook](cookbook/index.md) — starter recipes: inactive users, "All
   Users" grants, zombie sweep, embedded credentials…
 - [API coverage](api-coverage.md) — every endpoint, with implementation status
 - [Troubleshooting](troubleshooting.md) — symptoms → cause → fix

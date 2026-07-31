@@ -3,6 +3,11 @@
 Tracks every Tableau Cloud API endpoint this collector calls or plans to call.
 **Keep this file updated whenever an endpoint is implemented, added, or dropped.**
 
+This page is the *implementation* inventory: which endpoints exist, which are
+wired up, which are not. For what each one means for personal data — what is
+read, pseudonymised, redacted or never requested — see
+[What we collect](what-we-collect.md).
+
 Status legend:
 
 | Status | Meaning |

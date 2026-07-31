@@ -95,7 +95,7 @@ names — that join happens locally, against a vault the shared export doesn't c
 
 Six more validated recipes — broad "All Users" grants, content nobody opens, ownerless
 assets, embedded credentials — in the
-[query cookbook](https://github.com/simboli/tableau-cloud-audit/blob/main/docs/cookbook.md).
+[query cookbook](https://simboli.github.io/tableau-cloud-audit/cookbook/).
 
 ## The DuckDB package file
 
@@ -156,7 +156,7 @@ convenience views included:
 ![querying the export with DuckDB](https://raw.githubusercontent.com/simboli/tableau-cloud-audit/main/docs/assets/query.gif)
 
 More recipes like this in the
-[query cookbook](https://github.com/simboli/tableau-cloud-audit/blob/main/docs/cookbook.md).
+[query cookbook](https://simboli.github.io/tableau-cloud-audit/cookbook/).
 
 ## Have a question? Ask an AI
 

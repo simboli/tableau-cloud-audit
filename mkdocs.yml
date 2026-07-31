@@ -6,6 +6,7 @@ repo_name: simboli/tableau-cloud-audit
 
 theme:
   name: material
+  custom_dir: overrides
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
@@ -26,16 +27,25 @@ theme:
 
 nav:
   - Home: index.md
-  - Getting started: getting-started.md
-  - Getting ready: getting-ready.md
-  - Operations runbook: runbook.md
-  - CLI cheatsheet: cli-cheatsheet.md
-  - CLI reference: cli-reference.md
-  - What we collect: what-we-collect.md
-  - Package file schema: package-file-schema.md
-  - Query cookbook: cookbook.md
-  - API coverage: api-coverage.md
-  - Troubleshooting: troubleshooting.md
+  - Get started:
+      - Getting started: getting-started.md
+      - Troubleshooting: troubleshooting.md
+  - Use it:
+      - Query cookbook:
+          - Overview: cookbook/index.md
+          - Who hasn't signed in for 90+ days?: cookbook/inactive-users.md
+          - What is granted to "All Users"?: cookbook/all-users-grants.md
+          - Which content shows no access events?: cookbook/unused-content.md
+          - Who owns content but isn't in the user listing?: cookbook/ownerless-content.md
+          - Where do embedded credentials live?: cookbook/embedded-credentials.md
+          - How much content is certified?: cookbook/certified-content.md
+          - What does activity look like over time?: cookbook/activity-over-time.md
+      - Operations runbook: runbook.md
+  - Reference:
+      - CLI reference: cli-reference.md
+      - Package file schema: package-file-schema.md
+      - What we collect: what-we-collect.md
+      - API coverage: api-coverage.md
 
 markdown_extensions:
   - admonition

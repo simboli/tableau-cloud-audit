@@ -135,3 +135,15 @@ in the manifest aborts the write — it never leaks silently.
   user identity.
 - Group names are kept in clear by design (they usually encode departments,
   which the analysis needs).
+
+## Legal and works-council review
+
+The collector reads **per-user activity metadata**. It pseudonymises identities
+at write time and the shareable export contains no personal data — but in some
+jurisdictions (notably **Italy and Germany**, works-council rules) analysing
+per-user activity may require prior review by legal, the DPO, or employee
+representatives.
+
+Involve them *before* the first run, with this page in hand: it exists for
+exactly that conversation. It states, field by field, what is read, what is
+stored, what is pseudonymised and what never leaves the machine.

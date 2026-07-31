@@ -64,6 +64,18 @@ test). Schema versions are tracked independently in `meta.schema_migrations`.
 
 ### Changed
 
+- **Documentation restructured.** Eleven flat pages carrying three redundant
+  pairs became four grouped sections. `getting-ready` and `getting-started`
+  were one walkthrough split across two pages that each restated PAT creation,
+  site/pod discovery and Admin Insights provisioning — now a single
+  *Getting started* whose nav order no longer put "install and run" before
+  "get your credentials". The CLI cheatsheet is folded into the top of the CLI
+  reference as an at-a-glance table. The query cookbook became one page per
+  recipe, so each of the seven questions has its own URL instead of seven
+  questions competing for one. The legal/works-council note moved to
+  *What we collect*, the page it tells you to bring to that conversation.
+- **Documentation home page title** now states what the tool does instead of
+  repeating the package name.
 - **Repository prepared for public release.** `NOTICE` states the copyright
   holder (shipped in both sdist and wheel, as Apache-2.0 §4(d) requires), a
   Contributor Covenant `CODE_OF_CONDUCT.md` was added, and the PyPI metadata

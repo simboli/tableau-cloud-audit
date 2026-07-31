@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{#
+  The default Material title for the home page is just `site_name`, i.e. the
+  package name — a string nobody searches for. Give the landing page a title
+  that states what the tool does; every other page keeps Material's default.
+#}
+{% block htmltitle %}
+  {% if page.is_homepage %}
+    <title>tableau-cloud-audit — audit your Tableau Cloud site into one DuckDB file</title>
+  {% elif page.title %}
+    <title>{{ page.title | striptags }} - {{ config.site_name }}</title>
+  {% else %}
+    <title>{{ config.site_name }}</title>
+  {% endif %}
+{% endblock %}

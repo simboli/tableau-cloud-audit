@@ -3,6 +3,18 @@
 Seven commands, no more. Every command also documents itself: `tca --help`,
 `tca <command> --help`.
 
+## At a glance
+
+| Command | What it does | Needs |
+|---|---|---|
+| `tca init` | Wizard: writes `collector.toml`, creates the (optionally encrypted) package file | — |
+| `tca verify` | Pre-flight: config, secret, sign-in, Admin Insights/VDS, Metadata API, package file. Collects nothing | `TCA_PAT_SECRET` |
+| `tca collect` | Fetch → pseudonymise → land pages → rebuild typed state. Resumable, page by page | `TCA_PAT_SECRET` (+ `TCA_DB_KEY` if encrypted) |
+| `tca summary` | File contents: runs, pages, vault size, event/job history, coverage gaps | `TCA_DB_KEY` if encrypted |
+| `tca peek VIEW` | Browse the latest snapshot **with real identities** (local only; `users`, `members`, `content`, `rules`) | `TCA_DB_KEY` if encrypted |
+| `tca resolve U-####` | One pseudonym → full identity from the local vault | `TCA_DB_KEY` if encrypted |
+| `tca export [OUTPUT]` | The shareable copy: everything except the identity vault, verified, + SHA-256 sidecar | `TCA_DB_KEY` if encrypted |
+
 ## Global behavior
 
 - **Configuration**: commands read `collector.toml` from the current
@@ -105,3 +117,20 @@ anywhere aborts the export — plus a SHA-256 sidecar file.
 
 The original package file never leaves your machine; the export is the only
 artifact meant to.
+
+---
+
+## One-liners you will actually use
+
+```bash
+tca init                                    # first-time setup wizard
+source .env && tca verify                   # is everything still working?
+tca collect                                 # the monthly run
+tca collect --resume                        # pick up an interrupted run
+tca collect -m rest_core                    # quick users-only refresh
+tca summary                                 # what is in the file?
+tca peek rules -n 100                       # who can see what (real names)
+tca resolve U-0042                          # who is this pseudonym?
+tca export && shasum -a 256 -c *.sha256     # shareable copy + integrity check
+tca collect -c /path/to/collector.toml      # run against another site's config
+```
