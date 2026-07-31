@@ -239,7 +239,7 @@ is `None` so the three levels stay distinguishable; an empty selection fails lou
 **Default file locations**: `collector.toml` and the `.duckdb` file live in the current
 working directory (where the user runs `tca init`) — no hidden folders in `$HOME`.
 
-**Package author metadata** (pyproject): Nicola Simboli, nicola.simboli@gmail.com (for now).
+**Package author metadata** (pyproject): Nicola Simboli, support@simboli.eu.
 
 ## Workflow with the maintainer
 

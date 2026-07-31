@@ -62,6 +62,6 @@ scrub gate on the write path, not a post-processing step:
 ## Reporting a vulnerability
 
 Please report suspected vulnerabilities privately to
-**nicola.simboli@gmail.com** — do not open a public issue for security matters.
+**support@simboli.eu** — do not open a public issue for security matters.
 You will receive an acknowledgement within a few days. This project is in
 alpha: only the latest release is supported with fixes.

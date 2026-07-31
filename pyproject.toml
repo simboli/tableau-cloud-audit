@@ -5,7 +5,7 @@ description = "Open-source collector for Tableau Cloud: your entire estate in on
 readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
-authors = [{ name = "Nicola Simboli", email = "nicola.simboli@gmail.com" }]
+authors = [{ name = "Nicola Simboli", email = "support@simboli.eu" }]
 requires-python = ">=3.11"
 keywords = ["tableau", "tableau-cloud", "duckdb", "audit", "governance", "bi"]
 classifiers = [
