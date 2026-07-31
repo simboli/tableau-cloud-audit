@@ -64,6 +64,13 @@ test). Schema versions are tracked independently in `meta.schema_migrations`.
 
 ### Changed
 
+- **Repository prepared for public release.** `NOTICE` states the copyright
+  holder (shipped in both sdist and wheel, as Apache-2.0 §4(d) requires), a
+  Contributor Covenant `CODE_OF_CONDUCT.md` was added, and the PyPI metadata
+  gained `Documentation`/`Changelog`/`Issues` URLs plus per-version Python,
+  OS and topic classifiers. README links and images now use absolute URLs:
+  relative paths are not rewritten on the PyPI project page, where they would
+  have rendered as broken images and dead links.
 - **Export leak re-check is now symmetric.** `tca export` already re-verified
   that no e-mail-shaped strings survive in the shared copy; it now also re-scans
   for UUID-shaped known user LUIDs (the same guard the write-time safety net

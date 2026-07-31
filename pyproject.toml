@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Open-source collector for Tableau Cloud: your entire estate in one DuckDB file, pseudonymised by construction."
 readme = "README.md"
 license = "Apache-2.0"
-license-files = ["LICENSE"]
+license-files = ["LICENSE", "NOTICE"]
 authors = [{ name = "Nicola Simboli", email = "support@simboli.eu" }]
 requires-python = ">=3.11"
 keywords = ["tableau", "tableau-cloud", "duckdb", "audit", "governance", "bi"]
@@ -12,7 +12,13 @@ classifiers = [
   "Development Status :: 3 - Alpha",
   "Environment :: Console",
   "Intended Audience :: System Administrators",
+  "Intended Audience :: Information Technology",
+  "Operating System :: OS Independent",
   "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Database",
   "Topic :: System :: Systems Administration",
 ]
 dependencies = [
@@ -24,7 +30,11 @@ dependencies = [
 ]
 
 [project.urls]
+Homepage = "https://simboli.github.io/tableau-cloud-audit/"
+Documentation = "https://simboli.github.io/tableau-cloud-audit/"
 Repository = "https://github.com/simboli/tableau-cloud-audit"
+Changelog = "https://github.com/simboli/tableau-cloud-audit/blob/main/CHANGELOG.md"
+Issues = "https://github.com/simboli/tableau-cloud-audit/issues"
 
 [project.scripts]
 tca = "tca.cli:app"

@@ -54,3 +54,8 @@ verify` + `tca collect` against it is the best end-to-end check.
 Analysis logic. The collector extracts, pseudonymises, and stores — it never
 *evaluates* a site (no scores, tiers, effective-permission resolution, or
 recommendations). The only computation allowed is mechanical normalization.
+
+## Code of conduct
+
+Participation is governed by the [Contributor Covenant](CODE_OF_CONDUCT.md).
+Report unacceptable behaviour to support@simboli.eu.
