@@ -51,3 +51,14 @@ markdown_extensions:
   - admonition
   - tables
   - pymdownx.superfences
+
+extra:
+  # Ownership codes for the search consoles, rendered as <meta> tags by
+  # `overrides/main.html`. Leave a value empty and its tag is not emitted.
+  #   google — Search Console, "HTML tag" verification method, content= value only
+  #   bing   — Bing Webmaster Tools, msvalidate.01 value (or import from Google,
+  #            which verifies without a second code)
+  # Property to register is the docs root: https://simboli.github.io/tableau-cloud-audit/
+  site_verification:
+    google: ""
+    bing: ""

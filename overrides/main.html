@@ -14,3 +14,20 @@
     <title>{{ config.site_name }}</title>
   {% endif %}
 {% endblock %}
+
+{#
+  Search-console ownership tags. The codes live in `extra.site_verification`
+  in mkdocs.yml; an empty value renders nothing, so the site is safe to build
+  and deploy before either console is set up. Verification is what gives us
+  the query data — which recipe do people actually search for — it is not
+  needed for indexing.
+#}
+{% block extrahead %}
+  {% set verification = config.extra.get("site_verification", {}) %}
+  {% if verification.google %}
+    <meta name="google-site-verification" content="{{ verification.google }}">
+  {% endif %}
+  {% if verification.bing %}
+    <meta name="msvalidate.01" content="{{ verification.bing }}">
+  {% endif %}
+{% endblock %}
