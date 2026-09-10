@@ -29,7 +29,7 @@ assets).
 ## Quickstart
 
 ```bash
-pip install -e .                      # from a clone; PyPI release planned
+pip install tableau-cloud-audit
 
 tca init                              # wizard → collector.toml + package file
 export TCA_PAT_SECRET='<PAT secret>'  # never stored in files

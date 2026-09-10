@@ -358,8 +358,8 @@ nav. Also: commit history dates rewritten at maintainer's request
 (work-hours commits moved to evenings via filter-branch; backup branch
 `backup-original-dates` until he confirms the force-push).
 
-Next milestones: PyPI release (blocked on account unlock, see below), then
-repo → public per Launch_Plan.md.
+Next milestones: PyPI release (v0.2.0, unblocked 2026-09-09 — see below);
+repo went public 2026-07-31.
 
 Done 2026-07-19 (collector-functionality backlog, all four items):
 1. **Progress bars for per-item collect loops** — modules wrap loops in
@@ -433,11 +433,14 @@ no tokens) on GitHub Release published (or manual dispatch). Maintainer-side
 one-time setup: PyPI account with 2FA → Publishing → add pending publisher
 (project tableau-cloud-audit, owner simboli, repo tableau-cloud-audit,
 workflow release.yml, environment pypi).
-Release checklist remaining: PyPI pending-publisher setup + publish the
-GitHub Release (BLOCKED 2026-07-17: Nicola's PyPI account is temporarily
-locked — step-by-step guide for when it unlocks saved in
-`../tca-documentation/Guida_Pubblicazione_PyPI.md`), demo GIF for the
-README, then repo → public per Launch_Plan.md.
+~~Release checklist remaining~~ **UNBLOCKED 2026-09-09**: PyPI access
+restored. The stale `v0.1.0` tag is NOT what ships — main was 27 commits
+ahead of it, so the first PyPI release is **v0.2.0** (version bumped,
+`[Unreleased]` closed, install instructions switched to
+`pip install tableau-cloud-audit`). The GitHub Release published on
+2026-07-16 predates `release.yml`, so the workflow has never run: the
+first run is the one triggered by the v0.2.0 Release. Step-by-step guide:
+`../tca-documentation/Guida_Pubblicazione_PyPI.md`.
 
 Docs backlog: contributor architecture map in CONTRIBUTING.
 

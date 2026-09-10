@@ -90,12 +90,20 @@ store the passphrase in your password manager.
 ## 1. Install
 
 ```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install tableau-cloud-audit
+
+tca --version
+```
+
+Python 3.11 or newer. To work from the source instead — to try an unreleased
+fix, or to contribute — clone the repository and install it in editable mode:
+
+```bash
 git clone https://github.com/simboli/tableau-cloud-audit.git
 cd tableau-cloud-audit
 python3 -m venv .venv && source .venv/bin/activate
-pip install -e .          # PyPI release planned
-
-tca --version
+pip install -e .
 ```
 
 ## 2. Create a working directory and initialize

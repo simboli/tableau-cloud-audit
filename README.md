@@ -1,5 +1,6 @@
 # tableau-cloud-audit
 
+[![PyPI](https://img.shields.io/pypi/v/tableau-cloud-audit.svg)](https://pypi.org/project/tableau-cloud-audit/)
 [![CI](https://github.com/simboli/tableau-cloud-audit/actions/workflows/ci.yml/badge.svg)](https://github.com/simboli/tableau-cloud-audit/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://github.com/simboli/tableau-cloud-audit/blob/main/LICENSE)
 [![Python ≥ 3.11](https://img.shields.io/badge/python-%E2%89%A53.11-blue.svg)](https://github.com/simboli/tableau-cloud-audit/blob/main/pyproject.toml)
@@ -23,7 +24,7 @@ in a single local DuckDB file — so you can understand optimization opportuniti
 > **Status: working alpha.** Collects users, groups, memberships, projects, workbooks,
 > views, data sources, connections, permission rules (incl. project default templates)
 > and the Admin Insights activity sources (TS Events, TS Users, Site Content, Tokens,
-> Job Performance). Interfaces and schema may still change; install from source.
+> Job Performance). Interfaces and schema may still change.
 
 ## Design principles
 
@@ -44,7 +45,7 @@ in a single local DuckDB file — so you can understand optimization opportuniti
 ## Quickstart
 
 ```bash
-pip install -e .                      # from a clone; PyPI release planned
+pip install tableau-cloud-audit
 
 tca init                              # wizard → collector.toml + package file
 export TCA_PAT_SECRET='<PAT secret>'  # never stored in files
