@@ -433,16 +433,30 @@ no tokens) on GitHub Release published (or manual dispatch). Maintainer-side
 one-time setup: PyPI account with 2FA → Publishing → add pending publisher
 (project tableau-cloud-audit, owner simboli, repo tableau-cloud-audit,
 workflow release.yml, environment pypi).
-~~Release checklist remaining~~ **UNBLOCKED 2026-09-09**: PyPI access
-restored. The stale `v0.1.0` tag is NOT what ships — main was 27 commits
-ahead of it, so the first PyPI release is **v0.2.0** (version bumped,
-`[Unreleased]` closed, install instructions switched to
-`pip install tableau-cloud-audit`). The GitHub Release published on
-2026-07-16 predates `release.yml`, so the workflow has never run: the
-first run is the one triggered by the v0.2.0 Release. Step-by-step guide:
-`../tca-documentation/Guida_Pubblicazione_PyPI.md`.
+~~Release checklist remaining~~ **DONE 2026-09-10: v0.2.0 IS LIVE ON PyPI**
+(https://pypi.org/project/tableau-cloud-audit/). PyPI access was restored on
+2026-09-09; the stale `v0.1.0` tag was NOT what shipped — main was 27 commits
+ahead of it, so the first PyPI release is **v0.2.0**. Trusted Publishing
+worked first try (the pending publisher was consumed; future releases need no
+PyPI-side setup). The GitHub Release of 2026-07-16 predates `release.yml`,
+which is why that workflow had never run before. Install is now
+`pip install tableau-cloud-audit` everywhere (README, docs/index,
+getting-started keeps the editable-clone path for contributors); README has a
+PyPI version badge. Steady-state release process: bump `pyproject.toml` +
+`src/tca/__init__.py` → close `[Unreleased]` in CHANGELOG → commit → CI green
+→ `gh release create vX.Y.Z --notes-file <changelog section>` → the workflow
+publishes. Full guide: `../tca-documentation/Guida_Pubblicazione_PyPI.md`.
+2026-09-11: **social preview image** uploaded (card-c, the
+`mario.rossi@acme.it → U-0042` one, from `../tca-documentation/branding/`),
+so shared links stop rendering as grey cards.
 
-Docs backlog: contributor architecture map in CONTRIBUTING.
+~~Docs backlog: contributor architecture map in CONTRIBUTING~~ **DONE
+2026-09-11**: `CONTRIBUTING.md` now carries a "How the collector is built"
+map (the transport → sources → modules → pseudo → storage → normalize line,
+the two invariants — raw is source-of-truth AND checkpoint, nothing reaches
+the writer unscrubbed — and a "where things go" table). Same pass: deprecated
+Node-20 actions bumped (checkout@v7, setup-python@v7, upload-artifact@v7,
+download-artifact@v8; `pypa/gh-action-pypi-publish@release/v1` stays as is).
 
 Done 2026-07-17 (evening): **demo GIFs** recorded live with vhs
 (`docs/assets/demo.tape` → demo.gif: verify → collect rest_core → peek users;
