@@ -54,6 +54,13 @@ tca verify                            # PAT, site, Admin Insights/VDS access
 tca collect                           # collect everything (resumable)
 ```
 
+On Windows, in PowerShell, the two secret lines are instead:
+
+```powershell
+$env:TCA_PAT_SECRET = '<PAT secret>'  # never stored in files
+$env:TCA_DB_KEY = '<passphrase>'      # optional: encrypt the file at rest
+```
+
 Then explore:
 
 ```bash

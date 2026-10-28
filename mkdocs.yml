@@ -24,6 +24,7 @@ theme:
     - navigation.sections
     - navigation.top
     - content.code.copy
+    - content.tabs.link
 
 nav:
   - Home: index.md
@@ -51,6 +52,8 @@ markdown_extensions:
   - admonition
   - tables
   - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
 
 extra:
   # Ownership codes for the search consoles, rendered as <meta> tags by

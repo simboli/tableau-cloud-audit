@@ -28,13 +28,25 @@ the current window into `history.events` / `history.job_runs`, so as long
 as runs are less than ~90 days apart the accumulated history is gapless.
 Monthly is a comfortable cadence; weekly is fine too.
 
-```bash
-cd ~/tableau-audit                 # the directory with collector.toml
-source .env                        # secrets — see "Secrets & keys" below
-tca verify                         # 30 seconds, catches expired PATs early
-tca collect
-tca summary                        # sanity check, see below
-```
+=== "bash / zsh"
+
+    ```bash
+    cd ~/tableau-audit                 # the directory with collector.toml
+    source .env                        # secrets — see "Secrets & keys" below
+    tca verify                         # 30 seconds, catches expired PATs early
+    tca collect
+    tca summary                        # sanity check, see below
+    ```
+
+=== "PowerShell"
+
+    ```powershell
+    cd ~\tableau-audit                 # the directory with collector.toml
+    . .\.env.ps1                       # secrets — see "Secrets & keys" below
+    tca verify                         # 30 seconds, catches expired PATs early
+    tca collect
+    tca summary                        # sanity check, see below
+    ```
 
 After every run, check three things in `tca summary`:
 
@@ -67,24 +79,42 @@ The run status in `meta.collection_runs` carries the truth:
 
 ## Secrets & keys
 
-Recommended pattern — a `.env` file next to `collector.toml`, owner-readable
+Recommended pattern — a secrets file next to `collector.toml`, owner-readable
 only, never committed anywhere:
 
-```bash
-cat > .env <<'EOF'
-export TCA_PAT_SECRET='<PAT secret>'
-export TCA_DB_KEY='<package-file passphrase>'
-EOF
-chmod 600 .env
-```
+=== "bash / zsh"
 
-Then every session starts with `source .env`.
+    ```bash
+    cat > .env <<'EOF'
+    export TCA_PAT_SECRET='<PAT secret>'
+    export TCA_DB_KEY='<package-file passphrase>'
+    EOF
+    chmod 600 .env
+    ```
+
+    Then every session starts with `source .env`.
+
+=== "PowerShell"
+
+    ```powershell
+    @'
+    $env:TCA_PAT_SECRET = '<PAT secret>'
+    $env:TCA_DB_KEY = '<package-file passphrase>'
+    '@ | Set-Content .env.ps1
+    icacls .env.ps1 /inheritance:r /grant:r "$(whoami):F"
+    ```
+
+    `icacls` strips inherited permissions so only your account can read the
+    file. Then every session starts with `. .\.env.ps1` — the leading dot
+    matters: it loads the variables into the current session instead of a
+    throwaway one. If PowerShell refuses with *running scripts is disabled on
+    this system*, see [Install](getting-started.md#1-install).
 
 **PAT lifecycle.** Tableau Cloud PATs expire after **15 days of non-use**
 (and at most 1 year). A monthly-only cadence will hit the idle expiry:
 either run `tca verify` every week or two (any successful sign-in resets the
 clock), or expect to re-create the PAT before each run — takes a minute,
-update `.env` afterwards. `tca verify` failing with a 401 right after a
+update the secrets file afterwards. `tca verify` failing with a 401 right after a
 long pause is almost always this.
 
 **Encryption key.** `TCA_DB_KEY` is chosen once, at file creation, and must
@@ -104,10 +134,20 @@ a new file, losing history and pseudonym stability).
 
 ## Delivering an export
 
-```bash
-tca export                          # <database>-export.duckdb + .sha256
-shasum -a 256 -c *-export.duckdb.sha256    # verify before sending
-```
+=== "bash / zsh"
+
+    ```bash
+    tca export                          # <database>-export.duckdb + .sha256
+    shasum -a 256 -c *-export.duckdb.sha256    # verify before sending
+    ```
+
+=== "PowerShell"
+
+    ```powershell
+    tca export                          # <database>-export.duckdb + .sha256
+    $sum, $name = (Get-Content *-export.duckdb.sha256) -split '\s+', 2
+    (Get-FileHash $name -Algorithm SHA256).Hash -eq $sum    # True = verified
+    ```
 
 What the export contains — and provably cannot contain:
 

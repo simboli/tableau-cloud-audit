@@ -10,7 +10,7 @@ an afternoon of 401s, and `tca verify` confirms each step for you.
 |---|---|
 | A **Tableau Cloud** site | The collector targets Cloud (not Tableau Server) |
 | A user with the **Site Administrator** role | Only admins see all users, content and permissions; lesser roles produce silently incomplete data |
-| **Python ≥ 3.11** on the collection machine | The collector is a Python CLI |
+| **Python ≥ 3.11** on the collection machine (Windows, macOS or Linux) | The collector is a Python CLI |
 | Outbound HTTPS to `<pod>.online.tableau.com` | The only host the collector ever talks to |
 
 Disk space is a non-issue: even sites with thousands of items produce files in
@@ -89,22 +89,51 @@ store the passphrase in your password manager.
 
 ## 1. Install
 
-```bash
-python3 -m venv .venv && source .venv/bin/activate
-pip install tableau-cloud-audit
+=== "bash / zsh"
 
-tca --version
-```
+    ```bash
+    python3 -m venv .venv && source .venv/bin/activate
+    pip install tableau-cloud-audit
+
+    tca --version
+    ```
+
+=== "PowerShell"
+
+    ```powershell
+    py -m venv .venv
+    .venv\Scripts\Activate.ps1
+    pip install tableau-cloud-audit
+
+    tca --version
+    ```
+
+    `py` is the launcher the python.org installer adds; use `python` if you
+    installed Python another way. If activation fails with *running scripts is
+    disabled on this system*, allow local scripts for your user once —
+    `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` — and re-run it.
 
 Python 3.11 or newer. To work from the source instead — to try an unreleased
 fix, or to contribute — clone the repository and install it in editable mode:
 
-```bash
-git clone https://github.com/simboli/tableau-cloud-audit.git
-cd tableau-cloud-audit
-python3 -m venv .venv && source .venv/bin/activate
-pip install -e .
-```
+=== "bash / zsh"
+
+    ```bash
+    git clone https://github.com/simboli/tableau-cloud-audit.git
+    cd tableau-cloud-audit
+    python3 -m venv .venv && source .venv/bin/activate
+    pip install -e .
+    ```
+
+=== "PowerShell"
+
+    ```powershell
+    git clone https://github.com/simboli/tableau-cloud-audit.git
+    cd tableau-cloud-audit
+    py -m venv .venv
+    .venv\Scripts\Activate.ps1
+    pip install -e .
+    ```
 
 ## 2. Create a working directory and initialize
 
@@ -112,10 +141,20 @@ The collector writes `collector.toml` and the package file in the current
 directory — pick a dedicated folder you will keep (the package file is your
 archive: it accumulates history run after run).
 
-```bash
-mkdir ~/tableau-audit && cd ~/tableau-audit
-tca init
-```
+=== "bash / zsh"
+
+    ```bash
+    mkdir ~/tableau-audit && cd ~/tableau-audit
+    tca init
+    ```
+
+=== "PowerShell"
+
+    ```powershell
+    mkdir ~\tableau-audit
+    cd ~\tableau-audit
+    tca init
+    ```
 
 The wizard asks four questions (site, pod, PAT name, file name) and creates an
 empty package file. Nothing secret is written to disk.
@@ -124,10 +163,25 @@ empty package file. Nothing secret is written to disk.
 
 Secrets are **environment variables only** — never flags, never files:
 
-```bash
-export TCA_PAT_SECRET='<the PAT secret you copied>'
-export TCA_DB_KEY='<a passphrase you choose>'   # optional but recommended
-```
+=== "bash / zsh"
+
+    ```bash
+    export TCA_PAT_SECRET='<the PAT secret you copied>'
+    export TCA_DB_KEY='<a passphrase you choose>'   # optional but recommended
+    ```
+
+=== "PowerShell"
+
+    ```powershell
+    $env:TCA_PAT_SECRET = '<the PAT secret you copied>'
+    $env:TCA_DB_KEY = '<a passphrase you choose>'   # optional but recommended
+    ```
+
+Either way the variables live only in the current terminal session — open a
+new window and you set them again. That is the point: on Windows, avoid `setx`
+and the *Environment Variables* dialog, which store the secret permanently in
+your user profile. For a repeatable setup, see the
+[runbook's secrets pattern](runbook.md#secrets-keys).
 
 ## 4. Verify
 

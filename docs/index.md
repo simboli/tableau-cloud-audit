@@ -28,15 +28,29 @@ assets).
 
 ## Quickstart
 
-```bash
-pip install tableau-cloud-audit
+=== "bash / zsh"
 
-tca init                              # wizard → collector.toml + package file
-export TCA_PAT_SECRET='<PAT secret>'  # never stored in files
-export TCA_DB_KEY='<passphrase>'      # optional: encrypt the file at rest
-tca verify                            # PAT, site, Admin Insights/VDS access
-tca collect                           # collect everything (resumable)
-```
+    ```bash
+    pip install tableau-cloud-audit
+
+    tca init                              # wizard → collector.toml + package file
+    export TCA_PAT_SECRET='<PAT secret>'  # never stored in files
+    export TCA_DB_KEY='<passphrase>'      # optional: encrypt the file at rest
+    tca verify                            # PAT, site, Admin Insights/VDS access
+    tca collect                           # collect everything (resumable)
+    ```
+
+=== "PowerShell"
+
+    ```powershell
+    pip install tableau-cloud-audit
+
+    tca init                               # wizard → collector.toml + package file
+    $env:TCA_PAT_SECRET = '<PAT secret>'   # never stored in files
+    $env:TCA_DB_KEY = '<passphrase>'       # optional: encrypt the file at rest
+    tca verify                             # PAT, site, Admin Insights/VDS access
+    tca collect                            # collect everything (resumable)
+    ```
 
 Then explore:
 

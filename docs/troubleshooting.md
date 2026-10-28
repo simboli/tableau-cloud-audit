@@ -39,8 +39,11 @@ Use just the first label.
 
 ### "The TCA_PAT_SECRET environment variable is not set"
 
-Export it in the same terminal you run `tca` from:
-`export TCA_PAT_SECRET='<secret>'`. It is never read from files by design.
+Set it in the same terminal you run `tca` from —
+`export TCA_PAT_SECRET='<secret>'` in bash/zsh,
+`$env:TCA_PAT_SECRET = '<secret>'` in PowerShell. Either form lasts only for
+that terminal session, so a new window (or a scheduled task) needs it set
+again. It is never read from files by design.
 
 ## The package file
 
