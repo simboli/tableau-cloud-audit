@@ -1,9 +1,12 @@
 """Storage layer tests: schema bootstrap, run bookkeeping, identity vault, encryption."""
 
+from collections.abc import Callable
 from pathlib import Path
 
+import duckdb
 import pytest
 
+from tca.storage import writer
 from tca.storage.writer import SCHEMA_VERSION, PackageStore, StorageError
 
 
@@ -98,6 +101,80 @@ def test_encryption_roundtrip(tmp_path: Path) -> None:
 
     with pytest.raises(StorageError, match="Wrong encryption key"):
         PackageStore(path, encryption_key="nope").open()
+
+
+def storage_version(path: Path) -> str:
+    """The storage format of a plain file, read the way any DuckDB client sees it."""
+    con = duckdb.connect()
+    con.execute(f"ATTACH '{path.as_posix()}' AS f (READ_ONLY)")
+    row = con.execute("SELECT tags FROM duckdb_databases() WHERE database_name = 'f'").fetchone()
+    con.close()
+    assert row is not None
+    return str(row[0]["storage_version"])
+
+
+@pytest.fixture
+def newest_storage_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Simulate duckdb 2.x, whose default is to write its newest storage format."""
+    connect: Callable[..., duckdb.DuckDBPyConnection] = duckdb.connect
+
+    def connect_latest(*args: object, **kwargs: object) -> duckdb.DuckDBPyConnection:
+        con = connect(*args, **kwargs)
+        con.execute("SET storage_compatibility_version = 'latest'")
+        return con
+
+    monkeypatch.setattr(writer.duckdb, "connect", connect_latest)
+
+
+@pytest.mark.usefixtures("newest_storage_by_default")
+def test_new_plain_package_file_pins_storage_version(tmp_path: Path) -> None:
+    path = tmp_path / "pkg.duckdb"
+    with PackageStore(path):
+        pass
+    assert storage_version(path) == f"{writer.STORAGE_VERSION}+"
+
+
+@pytest.mark.usefixtures("newest_storage_by_default")
+def test_export_pins_storage_version(tmp_path: Path) -> None:
+    # the export is opened on someone else's machine: never in the writer's newest format
+    with PackageStore(tmp_path / "pkg.duckdb", encryption_key="s3cret") as s:
+        s.init_file_info("luid-1", "acme", None)
+        dest = tmp_path / "export.duckdb"
+        s.export_redacted(dest)
+    assert storage_version(dest) == f"{writer.STORAGE_VERSION}+"
+
+
+@pytest.mark.usefixtures("newest_storage_by_default")
+def test_new_encrypted_package_file_is_not_pinned(tmp_path: Path) -> None:
+    # encryption sets its own format; combining it with the pin is rejected by duckdb
+    with PackageStore(tmp_path / "pkg.duckdb", encryption_key="s3cret") as s:
+        s.init_file_info("luid-1", "acme", None)
+
+
+def test_existing_file_keeps_its_storage_version(tmp_path: Path) -> None:
+    # A file created in a NEWER format than the pin (e.g. by an earlier tca on
+    # duckdb 2.x) must still open: requesting the pin on it would be refused.
+    path = tmp_path / "pkg.duckdb"
+    con = duckdb.connect()
+    con.execute(f"ATTACH '{path.as_posix()}' AS f (STORAGE_VERSION 'v1.4.0')")
+    con.close()
+    with PackageStore(path) as s:
+        s.init_file_info("luid-1", "acme", None)
+    assert storage_version(path) == "v1.4.0+"
+
+
+def test_unsupported_storage_version_is_a_clear_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # stands in for a future duckdb that no longer writes the pinned format
+    monkeypatch.setattr(writer, "STORAGE_VERSION", "v0.0.1")
+    with pytest.raises(StorageError, match="verified up to duckdb"):
+        PackageStore(tmp_path / "pkg.duckdb").open()
+    with (
+        PackageStore(tmp_path / "enc.duckdb", encryption_key="s3cret") as s,
+        pytest.raises(StorageError, match="verified up to duckdb"),
+    ):
+        s.export_redacted(tmp_path / "export.duckdb")
 
 
 def test_summary(store: PackageStore) -> None:

@@ -74,12 +74,43 @@ a different file for the second site.
 The file's schema version is ahead of the installed collector. Update the
 collector; never downgrade a file.
 
+### "Trying to read a database file with version number N, but we can only read versions between X and Y"
+
+The full DuckDB error (here: a DuckDB 1.5 CLI opening a file written by
+duckdb 2.0):
+
+```text
+IO Error: Trying to read a database file with version number 999, but we can only read versions between 64 and 68.
+The database file was created with an newer version of DuckDB.
+```
+
+The DuckDB opening the file is **older than the one that wrote it**. A
+DuckDB file's storage format is fixed for life when the file is created, and
+older readers cannot open newer formats. `tca diagnostics` shows both sides
+at a glance: the collector's duckdb version and the file's storage format
+(`duckdb 2.0.0 (file storage v1.0.0+)`).
+
+- **Exports and unencrypted package files** are created in the `v1.0.0`
+  format, readable by any DuckDB ≥ 1.0, whichever duckdb the collector runs
+  on. Collector releases up to 0.2.0 did not pin the format, so on duckdb 2.x
+  they wrote files only DuckDB ≥ 2.0 can read. For an export, update the
+  collector and run `tca export` again: every export is a new file, so it
+  gets the portable format. An existing package file keeps its format: open
+  it with a DuckDB at least as new as the one that created it.
+- **Encrypted package files** cannot be pinned: their format is set by
+  DuckDB's encryption. A file encrypted by duckdb 1.5 or later needs a
+  reader ≥ 1.5. Update the reader (`brew upgrade duckdb`, or the driver in
+  your GUI client). The encrypted file is never meant to leave your machine
+  anyway: the plain export is the one that travels.
+
 ### My GUI client (DBeaver, …) shows an empty "memory" database
 
 The connection did not actually open your (encrypted) file — you are looking
 at an in-memory session. In a SQL editor run the `ATTACH` above, then refresh
 the tree: the file appears as its own catalog. Requires a **DuckDB driver ≥
-1.4** (encryption support); update it via the client's driver manager.
+1.4** (encryption support) — and ≥ 1.5 if the collector runs on duckdb 1.5
+or later, whose encrypted files 1.4.x cannot read (see the version-number
+error above); update it via the client's driver manager.
 
 ### `zsh: command not found: duckdb`
 

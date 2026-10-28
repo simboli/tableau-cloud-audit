@@ -10,6 +10,18 @@ test). Schema versions are tracked independently in `meta.schema_migrations`.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Exports and unencrypted package files no longer depend on the installed
+  duckdb's storage format.** On duckdb 2.x they were written in its newest
+  format, which no DuckDB 1.x client (including most DuckDB CLIs) can open —
+  breaking `duckdb <file>` and, above all, the export, whose purpose is to be
+  opened elsewhere. New plain files are now created in the `v1.0.0` storage
+  format (readable by any DuckDB ≥ 1.0); existing files keep their format.
+  Encrypted files are not pinned: DuckDB's encryption sets their format.
+- `tca diagnostics` shows the package file's storage format next to the
+  duckdb version.
+
 ## [0.2.0] — 2026-09-09
 
 First release published on PyPI: `pip install tableau-cloud-audit`.

@@ -39,6 +39,26 @@ MIGRATIONS: tuple[tuple[str, str], ...] = (
 SCHEMA_VERSION = MIGRATIONS[-1][0]
 _CATALOG = "pkg"
 
+# Storage format of every PLAIN file tca creates (exports, unencrypted package
+# files), so it does not depend on whichever duckdb pip resolved. Left alone,
+# duckdb 2.x writes its newest format, which no 1.x client (including most
+# installed DuckDB CLIs) can open — breaking `duckdb <file>` and, worse, the
+# export, whose whole point is to be opened on someone else's machine.
+# v1.0.0 = readable by any duckdb >= 1.0.
+# - Passed as ATTACH's STORAGE_VERSION only when the file is created: a file's
+#   format is fixed for life, and duckdb refuses to open an existing file with
+#   a lower requested version ("cannot be lowered").
+# - Encrypted files are deliberately NOT pinned. Their format is set by DuckDB's
+#   encryption, not by any storage setting: a file encrypted by duckdb >= 1.5
+#   reports v1.5.0+ on reopen and no 1.4.x can read it, whatever version was
+#   requested (and v1.0.0 is rejected outright alongside ENCRYPTION_KEY). They
+#   never travel anyway — only the plain export does.
+# Verified on duckdb 1.4.0, 1.4.5, 1.5.4 and 2.0.0. Unverified beyond 2.0.0: a
+# future duckdb dropping the v1.0.0 format would surface as a StorageError (see
+# _storage_version_error), never as a silently newer file.
+STORAGE_VERSION = "v1.0.0"
+DUCKDB_VERIFIED_UP_TO = "2.0.0"
+
 # TS Events caption -> history.events column. Captions MUST stay in sync with
 # the curated field list in the VDS manifest (tca/pseudo/manifest.py).
 TS_EVENTS_COLUMNS: tuple[tuple[str, str], ...] = (
@@ -110,6 +130,24 @@ def _sql_literal(value: str) -> str:
     return value.replace("'", "''")
 
 
+def _attach_options(*, create: bool, key: str | None) -> str:
+    if key is not None:
+        return f" (ENCRYPTION_KEY '{_sql_literal(key)}')"
+    return f" (STORAGE_VERSION '{STORAGE_VERSION}')" if create else ""
+
+
+def _storage_version_error(path: Path, exc: duckdb.Error) -> StorageError | None:
+    message = str(exc).lower()
+    if not any(s in message for s in ("storage_version", "storage version", "duckdb version")):
+        return None
+    return StorageError(
+        f"duckdb {duckdb.__version__} refused to create '{path}' in the storage format "
+        f"tca pins so its files stay readable by older DuckDB clients ({exc}). tca is "
+        f"verified up to duckdb {DUCKDB_VERIFIED_UP_TO}: please report this, and "
+        f'meanwhile run `pip install "duckdb<={DUCKDB_VERIFIED_UP_TO}"`.'
+    )
+
+
 class PackageStore:
     """Owns the connection to one package file.
 
@@ -131,9 +169,7 @@ class PackageStore:
 
     def open(self) -> PackageStore:
         con = duckdb.connect()
-        options = ""
-        if self._key is not None:
-            options = f" (ENCRYPTION_KEY '{_sql_literal(self._key)}')"
+        options = _attach_options(create=not self.path.exists(), key=self._key)
         attach_path = _sql_literal(self.path.as_posix())
         try:
             con.execute(f"ATTACH '{attach_path}' AS {_CATALOG}{options}")
@@ -145,6 +181,8 @@ class PackageStore:
                 ) from exc
             raise StorageError(f"Cannot open '{self.path}': {exc}") from exc
         except duckdb.InvalidInputException as exc:
+            if (version_error := _storage_version_error(self.path, exc)) is not None:
+                raise version_error from exc
             if "encryption key" in str(exc).lower():
                 raise StorageError(
                     f"Wrong encryption key for '{self.path}'. Check TCA_DB_KEY."
@@ -540,7 +578,13 @@ class PackageStore:
         """
         if dest.exists():
             raise StorageError(f"'{dest}' already exists — refusing to overwrite.")
-        self.con.execute(f"ATTACH '{_sql_literal(dest.as_posix())}' AS exp")
+        options = _attach_options(create=True, key=None)
+        try:
+            self.con.execute(f"ATTACH '{_sql_literal(dest.as_posix())}' AS exp{options}")
+        except duckdb.InvalidInputException as exc:
+            if (version_error := _storage_version_error(dest, exc)) is not None:
+                raise version_error from exc
+            raise
         try:
             tables = self.con.execute(
                 f"""
@@ -723,9 +767,14 @@ class PackageStore:
             "  WHERE length(i.user_luid) = 36 AND contains(r.payload::VARCHAR, i.user_luid))"
         ).fetchone()
         assert email_hits is not None and luid_hits is not None
+        # the format this file was created in (fixed for life) — what a reader needs
+        tags = self.con.execute(
+            "SELECT tags FROM duckdb_databases() WHERE database_name = ?", [_CATALOG]
+        ).fetchone()
         return {
             "schema_version": info[4] if info else None,
             "is_encrypted": info[5] if info else None,
+            "storage_version": (tags[0] or {}).get("storage_version") if tags else None,
             "runs": counts[0],
             "response_pages": counts[1],
             "known_users": counts[2],

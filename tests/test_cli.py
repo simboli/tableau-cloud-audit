@@ -259,6 +259,7 @@ def test_diagnostics_scrubs_pii_from_notes(workdir: Path) -> None:
     assert luid not in result.output
     assert "[redacted-email]" in result.output
     assert "[redacted-luid]" in result.output
+    assert "file storage v1.0.0+" in result.output  # next to the duckdb version
 
 
 def test_export_after_collect(workdir: Path, httpx_mock: HTTPXMock) -> None:

@@ -620,6 +620,7 @@ def _diagnostics_report(
         report["config"] = {"retention_raw_days": cfg.retention.raw_days}
         return report
 
+    env["storage"] = data["storage_version"]
     env["schema"] = f"v{data['schema_version']}"
     env["encrypted"] = bool(data["is_encrypted"])
     runs_out: list[dict[str, Any]] = []
@@ -660,6 +661,13 @@ def _diagnostics_report(
     return report
 
 
+def _diag_duckdb(env: dict[str, Any]) -> str:
+    # the package file's storage format sits next to the library version: a file
+    # newer than a reader's duckdb is the classic "cannot open it elsewhere" cause
+    storage = env.get("storage")
+    return f"{env['duckdb']} (file storage {storage})" if storage else env["duckdb"]
+
+
 def _integrity_mark(integrity: dict[str, Any]) -> str:
     clean = not (integrity["raw_email_hits"] or integrity["raw_luid_hits"])
     return "✓" if clean else "⚠"
@@ -667,7 +675,7 @@ def _integrity_mark(integrity: dict[str, Any]) -> str:
 
 def _render_diag_text(r: dict[str, Any]) -> str:
     e = r["environment"]
-    env_line = f"tca {e['tca']} · python {e['python']} · duckdb {e['duckdb']} · {e['platform']}"
+    env_line = f"tca {e['tca']} · python {e['python']} · duckdb {_diag_duckdb(e)} · {e['platform']}"
     if "schema" in e:
         env_line += f" · schema {e['schema']} · encrypted: {e['encrypted']}"
     lines = [_DIAG_BANNER, "", "Environment", f"  {env_line}", ""]
@@ -719,7 +727,7 @@ def _render_diag_text(r: dict[str, Any]) -> str:
 
 def _render_diag_markdown(r: dict[str, Any]) -> str:
     e = r["environment"]
-    env_line = f"tca {e['tca']} · python {e['python']} · duckdb {e['duckdb']} · {e['platform']}"
+    env_line = f"tca {e['tca']} · python {e['python']} · duckdb {_diag_duckdb(e)} · {e['platform']}"
     if "schema" in e:
         env_line += f" · schema {e['schema']} · encrypted: {e['encrypted']}"
     lines = [
