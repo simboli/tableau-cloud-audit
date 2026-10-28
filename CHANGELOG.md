@@ -10,6 +10,8 @@ test). Schema versions are tracked independently in `meta.schema_migrations`.
 
 ## [Unreleased]
 
+## [0.2.1] — 2026-10-28
+
 ### Fixed
 
 - **Exports and unencrypted package files no longer depend on the installed
@@ -181,6 +183,7 @@ First public release.
 - **CI** (GitHub Actions): ruff, mypy, full test suite on Python 3.11/3.13;
   the schema contract test gates every merge; docs deploy to GitHub Pages.
 
-[Unreleased]: https://github.com/simboli/tableau-cloud-audit/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/simboli/tableau-cloud-audit/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/simboli/tableau-cloud-audit/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/simboli/tableau-cloud-audit/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/simboli/tableau-cloud-audit/releases/tag/v0.1.0
