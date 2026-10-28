@@ -51,7 +51,7 @@ tca export            # the shareable copy: everything EXCEPT the identity vault
 
 - [Getting started](getting-started.md) — PAT, site name, Admin Insights, the
   full walkthrough and the kick-off checklist
-- [CLI reference](cli-reference.md) — all seven commands, options, exit codes
+- [CLI reference](cli-reference.md) — all nine commands, options, exit codes
 - [What we collect](what-we-collect.md) — field-level transparency
 - [Package file schema](package-file-schema.md) — table-by-table guide for
   querying the file

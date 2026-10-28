@@ -1,6 +1,6 @@
 # CLI reference
 
-Seven commands, no more. Every command also documents itself: `tca --help`,
+Nine commands, no more. Every command also documents itself: `tca --help`,
 `tca <command> --help`.
 
 ## At a glance
@@ -11,6 +11,8 @@ Seven commands, no more. Every command also documents itself: `tca --help`,
 | `tca verify` | Pre-flight: config, secret, sign-in, Admin Insights/VDS, Metadata API, package file. Collects nothing | `TCA_PAT_SECRET` |
 | `tca collect` | Fetch → pseudonymise → land pages → rebuild typed state. Resumable, page by page | `TCA_PAT_SECRET` (+ `TCA_DB_KEY` if encrypted) |
 | `tca summary` | File contents: runs, pages, vault size, event/job history, coverage gaps | `TCA_DB_KEY` if encrypted |
+| `tca runs` | The run log: every collection run with status, duration, pages, modules. `--last -q` for scripting | `TCA_DB_KEY` if encrypted |
+| `tca diagnostics` | PII-free health & scale report, safe to paste into a GitHub issue. Reads the file only, no network | `TCA_DB_KEY` if encrypted |
 | `tca peek VIEW` | Browse the latest snapshot **with real identities** (local only; `users`, `members`, `content`, `rules`) | `TCA_DB_KEY` if encrypted |
 | `tca resolve U-####` | One pseudonym → full identity from the local vault | `TCA_DB_KEY` if encrypted |
 | `tca export [OUTPUT]` | The shareable copy: everything except the identity vault, verified, + SHA-256 sidecar | `TCA_DB_KEY` if encrypted |
@@ -89,6 +91,38 @@ count, response pages, identity-vault size, event- and job-run-history
 counts, the event-history window and **coverage gaps** (warns when runs were
 further apart than the retention window).
 
+## `tca runs`
+
+The run log: every collection run, newest first, with its status, start
+time, duration, landed pages and modules; run notes (e.g. why a run was
+aborted) are printed below the table.
+
+| Option | Effect |
+|---|---|
+| `--limit/-n N` | Show only the most recent N runs (default: all) |
+| `--last` | Only the most recent run |
+| `--quiet/-q` | Print only each run's status, one per line (machine-readable) |
+
+`tca runs --last -q` prints just the last run's status (`ok`, `partial`,
+`failed`, ...) so a scheduled pipeline can branch on it — e.g. run
+`tca collect --resume` after a `partial` instead of starting fresh. Fails
+with exit code `1` if the package file does not exist yet.
+
+## `tca diagnostics`
+
+A health & scale report that is **PII-free by design**, meant to be pasted
+into a bug or scale report. It reads the package file only (no network, no
+PAT): versions, run history, per-table row counts and integrity signals —
+never names, e-mails, LUIDs or your site identity (site name, pod and PAT
+name are omitted). Run notes are scrubbed, and the whole report passes a
+final PII self-gate before it is emitted. Without a package file it still
+reports the environment.
+
+| Option | Effect |
+|---|---|
+| `--format/-f FORMAT` | `text`, `markdown` or `json` (default `text`). `markdown` is ready for a GitHub issue |
+| `--output/-o PATH` | Write the report to a file instead of stdout |
+
 ## `tca peek VIEW`
 
 Browse the latest snapshot **with real identities** — resolved locally by
@@ -129,6 +163,8 @@ tca collect                                 # the monthly run
 tca collect --resume                        # pick up an interrupted run
 tca collect -m rest_core                    # quick users-only refresh
 tca summary                                 # what is in the file?
+tca runs --last -q                          # last run's status, for scripts
+tca diagnostics -f markdown                 # PII-free report for a GitHub issue
 tca peek rules -n 100                       # who can see what (real names)
 tca resolve U-0042                          # who is this pseudonym?
 tca export && shasum -a 256 -c *.sha256     # shareable copy + integrity check

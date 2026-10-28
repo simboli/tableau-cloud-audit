@@ -9,15 +9,15 @@ body:
         Thanks for running **tableau-cloud-audit** on a real site! Reports from larger
         estates are how we harden it beyond the tiny dev sandbox it is built on.
 
-        **Privacy first — the easy way to share numbers is `tca diagnostics --markdown`.**
+        **Privacy first — the easy way to share numbers is `tca diagnostics --format markdown`.**
         Its output is PII-free *by construction*: no names, e-mails, LUIDs or your site
         identity, and it passes a final self-gate before printing. Paste it below and you
         are done. (Prefer not to? Skip it and just fill in the rough scale.)
   - type: textarea
     id: diagnostics
     attributes:
-      label: "`tca diagnostics --markdown` output"
-      description: Run `tca diagnostics --markdown` and paste the whole report here.
+      label: "`tca diagnostics --format markdown` output"
+      description: Run `tca diagnostics --format markdown` and paste the whole report here.
       placeholder: |
         ## tca diagnostics
         _Safe to share — no names, e-mails, LUIDs or site identity._

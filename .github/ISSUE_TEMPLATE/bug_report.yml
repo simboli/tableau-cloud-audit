@@ -8,7 +8,7 @@ body:
       value: |
         Thanks for reporting! A few structured details make bugs much quicker to fix.
 
-        **Privacy:** the safest way to hand us context is `tca diagnostics --markdown` —
+        **Privacy:** the safest way to hand us context is `tca diagnostics --format markdown` —
         PII-free by design. If you paste an error or traceback, glance over it first and
         redact anything site-specific: the collector masks the PAT and pseudonymises
         identities, but a raw Python traceback can still echo payload fragments.
@@ -59,8 +59,8 @@ body:
   - type: textarea
     id: diagnostics
     attributes:
-      label: "`tca diagnostics --markdown` output"
-      description: Run `tca diagnostics --markdown` and paste it — PII-free by design; gives us versions + scale at a glance.
+      label: "`tca diagnostics --format markdown` output"
+      description: Run `tca diagnostics --format markdown` and paste it — PII-free by design; gives us versions + scale at a glance.
       placeholder: |
         ## tca diagnostics
         _Safe to share — no names, e-mails, LUIDs or site identity._

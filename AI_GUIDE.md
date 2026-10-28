@@ -146,7 +146,7 @@ docs/                 # PUBLIC docs only (MkDocs Material site)
 - `clear` — read-time views re-joining `state` with `identity.map` so the
   local user sees real names (`tca peek` reads these; impossible on an export).
 
-## 5. The CLI surface (7 commands)
+## 5. The CLI surface (9 commands)
 
 Secrets are environment variables ONLY, never flags or files:
 `TCA_PAT_SECRET` (the PAT), `TCA_DB_KEY` (optional encryption passphrase).
@@ -157,6 +157,8 @@ Secrets are environment variables ONLY, never flags or files:
 | `tca verify` | Pre-flight: config, secret, sign-in, Admin Insights/VDS, Metadata API, file. Collects nothing |
 | `tca collect` | The main run: fetch → pseudonymise → land → normalize. `--modules/-m`, `--resume` |
 | `tca summary` | What the file holds: runs, pages, vault size, history window, coverage gaps |
+| `tca runs` | The run log: status, duration, pages, modules per run. `--limit/-n`, `--last`, `--quiet/-q` |
+| `tca diagnostics` | PII-free health & scale report for bug/scale issues, file-only (no network). `--format/-f text\|markdown\|json`, `--output/-o` |
 | `tca peek VIEW` | Browse the latest snapshot WITH real identities (local only): `users`, `members`, `content`, `rules` |
 | `tca resolve U-####` | One pseudonym → full identity, from the local vault |
 | `tca export [OUT]` | The shareable copy: everything except `identity`, verified, + SHA-256 |

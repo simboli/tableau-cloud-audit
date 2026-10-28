@@ -415,7 +415,7 @@ closing line points at the deeper questions without answering them).
 Done 2026-07-16 (docs day, cont.): `docs/getting-ready.md` (kick-off guide:
 PAT step-by-step with 15-day expiry note, contentUrl-vs-display-name trap,
 pod, Admin Insights provisioning, encryption decision, works-council/legal
-section, final checklist) and `docs/cli-reference.md` (all 7 commands,
+section, final checklist) and `docs/cli-reference.md` (all commands,
 options, env vars, exit codes 0/1/130, module table, run statuses). Site nav
 order: Home → Getting ready → CLI reference → What we collect → Schema →
 Cookbook → API coverage → Troubleshooting.
@@ -563,11 +563,11 @@ Backlog added 2026-07-22 (from a repo review — priority order):
        without needing new users (watch storage/seat limits).
     3. Real large site → later, with a consenting pilot client.
 - **Issue templates — DONE 2026-07-24/25.** `.github/ISSUE_TEMPLATE/`:
-  `scale_report.yml` (pairs with `tca diagnostics --markdown`: PII-free report +
+  `scale_report.yml` (pairs with `tca diagnostics --format markdown`: PII-free report +
   outcome + rough scale + observations + privacy ack) and `bug_report.yml`
   (what happened + command + repro + error + the same diagnostics paste + privacy
   ack), plus `config.yml` keeping blank issues enabled and routing security
-  reports to SECURITY.md. Both forms lead with `tca diagnostics --markdown` so
+  reports to SECURITY.md. Both forms lead with `tca diagnostics --format markdown` so
   reports arrive with PII-free context. Turns the OSS-feedback hope into a
   low-effort, safe channel (see the scale/feedback discussion). Labels
   `scale-report`/`bug` exist in the repo.
