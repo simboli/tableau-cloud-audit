@@ -10,6 +10,17 @@ test). Schema versions are tracked independently in `meta.schema_migrations`.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The "embedded credentials" cookbook recipe returned no rows after a
+  partial run.** It still filtered `state.connections` on the latest ok run,
+  a leftover from before state became current-only (v0.8): after a run that
+  skipped the `content` module, no connection row carried that run id. The
+  filter is gone — `state` already holds only the current snapshot.
+- The schema map (`docs/package-file-schema.md`) and `AI_GUIDE.md` now
+  describe schema v0.8: current-only `state`, the `[retention] raw_days` knob
+  for `raw`, and the retired `meta.v_endpoint_latest_run` view.
+
 ## [0.2.1] — 2026-10-28
 
 ### Fixed

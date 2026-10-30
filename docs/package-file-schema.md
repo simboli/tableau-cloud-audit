@@ -1,8 +1,10 @@
 # Package file — schema map
 
 Orientation guide to the DuckDB package file produced by **tableau-cloud-audit**
-(`tca`). Current schema version: **v0.7** (July 2026). One file per Tableau Cloud
-site; every table carries `run_id` — full snapshot per run, never deltas.
+(`tca`). Current schema version: **v0.8** (tca 0.2.0, September 2026). One file
+per Tableau Cloud site, reused run after run: `raw` keeps a full snapshot of
+every run (never deltas), `state` holds the current snapshot, `history`
+accumulates beyond Tableau's retention window.
 
 > Opening the file: it is usually **encrypted**. From a SQL client (DBeaver, duckdb
 > CLI) connect to an in-memory DuckDB and run:
@@ -27,7 +29,6 @@ site; every table carries `run_id` — full snapshot per run, never deltas.
 | `event_coverage` | the event time-window each run covered |
 | `v_event_gaps` 👁 | **holes** in the event history between runs (empty = no gaps) |
 | `v_latest_run` 👁 | id of the latest `ok` run |
-| `v_endpoint_latest_run` 👁 | per endpoint, the latest `ok` run that actually collected it — what the `v_*_current` views are built on |
 
 ## `raw` — the source of truth *(pseudonymised API payloads)*
 
@@ -35,11 +36,18 @@ site; every table carries `run_id` — full snapshot per run, never deltas.
 |---|---|
 | `api_responses` | 1 row = 1 API response page; full JSON in `payload`, **already pseudonymised** (identities appear only as `U-####`). Everything is here, but it is inconvenient to query — that is what `state` is for |
 
+`raw` is the part of the file that grows with every run. Cap it with `raw_days`
+in the `[retention]` table of `collector.toml`: at the end of each collect, raw
+pages of runs older than that are pruned (`0` = keep forever, the default).
+`history`, `identity` and the run bookkeeping are never pruned.
+
 ## `state` — the convenient tables *(1 row = 1 object, derived from raw)* ⭐
 
-Rebuilt mechanically from `raw` at the end of every collect. Every table has
-`run_id`; the `v_*_current` 👁 views pre-filter on the latest `ok` run.
-**This is where analysis queries live.**
+Rebuilt mechanically from `raw` at the end of every collect, **current-only**:
+each table holds exactly one snapshot — the one from the last run that
+collected it — so it grows with the site, not with the number of runs. Every
+table keeps `run_id` as provenance (which run that snapshot came from), not as
+a filter. **This is where analysis queries live.**
 
 | Object | Contents |
 |---|---|
@@ -61,7 +69,7 @@ Rebuilt mechanically from `raw` at the end of every collect. Every table has
 | `upstream_tables` | lineage: the tables/databases each datasource reads |
 | `sheet_fields` | which fields each sheet actually uses (worksheet + datasource references) |
 | `workbook_datasources` | embedded vs published datasource usage per workbook |
-| `v_users_current`, `v_groups_current`, `v_content_current`, `v_permission_rules_current` 👁 | the same, each filtered to the latest `ok` run **that collected that data** — a partial run (e.g. users only) refreshes only what it collected, it never empties the other views |
+| `v_users_current`, `v_groups_current`, `v_content_current`, `v_permission_rules_current` 👁 | stable names for `users`, `groups`, `content_items` and `permission_rules`, kept for compatibility — since v0.8 they read `state` directly. A partial run (e.g. users only) replaces only the tables it collected; the others keep their last snapshot, never emptied |
 
 ## `history` — the accumulator that outlives retention
 
@@ -119,4 +127,5 @@ response of something.
 *Compatibility promise: the schema is additive-only — tables and columns listed
 here never disappear or change type in future versions (enforced by
 [`tests/test_schema_contract.py`](https://github.com/simboli/tableau-cloud-audit/blob/main/tests/test_schema_contract.py)).
-New columns/tables may appear.*
+New columns/tables may appear. The one retirement so far is the internal helper
+view `meta.v_endpoint_latest_run`, made obsolete by current-only state in v0.8.*

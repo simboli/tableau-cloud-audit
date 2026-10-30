@@ -129,18 +129,17 @@ docs/                 # PUBLIC docs only (MkDocs Material site)
 3. History accumulation: TS Events → `history.events`, Job Performance →
    `history.job_runs` (deduplicated on a natural key, cumulative across runs —
    this is what outlives Tableau's retention window).
-4. `normalize.py` rebuilds the typed `state.*` tables from the raw pages of
-   this run (delete + insert; raw stays the source of truth).
+4. `normalize.py` rebuilds the typed `state.*` tables this run collected
+   (whole-table delete + insert, current-only; raw stays the source of truth).
 
-**The package-file schema (current version v0.7)** has these DuckDB schemas:
+**The package-file schema (current version v0.8)** has these DuckDB schemas:
 
 - `meta` — logbook: `file_info`, `collection_runs`, `schema_migrations`,
-  `event_coverage`, and views (`v_latest_run`, `v_endpoint_latest_run`,
-  `v_event_gaps`).
+  `event_coverage`, and views (`v_latest_run`, `v_event_gaps`).
 - `raw` — `api_responses`: the source of truth, scrubbed JSON payloads.
-- `state` — convenient typed tables, one row per object, rebuilt each run,
-  with `v_*_current` views (each following the latest run that actually
-  collected that data — see §7 "known subtleties").
+- `state` — convenient typed tables, one row per object, current-only (one
+  snapshot per table — see §7 "known subtleties"), with `v_*_current` views
+  kept as stable names.
 - `history` — `events`, `job_runs`: append-only accumulators.
 - `identity` — `map`: the vault (the only real identities; absent from exports).
 - `clear` — read-time views re-joining `state` with `identity.map` so the
@@ -217,14 +216,19 @@ traceback) · `130` Ctrl-C (the run is resumable).
   `(run_id, endpoint, entity_luid, page)`; resume skips already-landed units.
   History accumulation reads *back from raw*, so a crash between landing and
   accumulating heals on re-run.
-- **`v_*_current` semantics (v0.7)**: each `state.v_*_current` view follows the
-  latest ok run that *actually collected that data* (via
-  `meta.v_endpoint_latest_run`), NOT the single latest run. This is so a
-  partial run (e.g. `-m rest_core`) refreshes only users and doesn't empty the
-  permissions/content views. An empty listing still lands a page, so
-  genuinely-empty data stays empty (no stale ghosts).
+- **`state` is current-only (v0.8)**: `normalize` replaces a state table only
+  when the run landed a page of its source endpoint; tables the run did not
+  collect keep their previous snapshot. So a partial run (e.g. `-m rest_core`)
+  refreshes users without emptying permissions/content, and state size tracks
+  the site, not the run count. `run_id` on state rows is provenance, never a
+  join key: different tables may carry different run_ids. An empty listing
+  still lands a page, so genuinely-empty data stays empty (no stale ghosts).
+  The v0.7 mechanism (`meta.v_endpoint_latest_run`) was retired with it.
+- **`raw` is what grows with runs**: `[retention] raw_days` in `collector.toml`
+  prunes old runs' raw pages at the end of each collect (`0` = keep forever,
+  the default); `history`, `identity` and the run log are never pruned.
 - **`EXPORT_SAFE_VIEWS`** in `writer.py` recreates identity-free convenience
-  views inside the export and must stay in sync with migrations 002/003/007.
+  views inside the export and must stay in sync with migrations 002/003/008.
   The `clear.*` views must NEVER be added there (they touch identity).
 - **Encryption is opt-in but recommended**: if `TCA_DB_KEY` is unset the file
   is written unencrypted with a clear warning (maintainer's decision — no hard
@@ -240,7 +244,7 @@ traceback) · `130` Ctrl-C (the run is resumable).
 
 The collector is **feature-complete for its MVP scope and verified live**
 against a real Tableau Cloud sandbox. CI is green; the docs site is published.
-Schema is at v0.7. ~98 tests pass.
+Schema is at v0.8. ~128 tests pass.
 
 What is deliberately deferred or out of scope (do not "helpfully" build these
 without discussing scope first): the proprietary analysis engine (§2); typed
