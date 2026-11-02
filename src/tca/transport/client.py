@@ -123,8 +123,8 @@ class RestClient:
                 attempt += 1
                 if attempt >= MAX_ATTEMPTS:
                     raise TransportError(
-                        f"Giving up after {MAX_ATTEMPTS} attempts on {method} {url}: "
-                        f"{_describe(response)}",
+                        f"Giving up after {MAX_ATTEMPTS} attempts on {method} "
+                        f"{self._display_path(url)}: {_describe(response)}",
                         status_code=response.status_code,
                     )
                 self._sleep(_backoff_seconds(response, attempt))
@@ -137,7 +137,7 @@ class RestClient:
                 continue
 
             if response.status_code >= 400:
-                message = f"{method} {url}: {_describe(response)}"
+                message = f"{method} {self._display_path(url)}: {_describe(response)}"
                 if not authed and "signin" in url:
                     message += (
                         " — sign-in failed: check the PAT name, the TCA_PAT_SECRET "
@@ -155,6 +155,14 @@ class RestClient:
                     f"{method} {url} returned HTTP {response.status_code} with a "
                     f"non-JSON body: {response.text[:200]!r}"
                 ) from exc
+
+    def _display_path(self, url: str) -> str:
+        # Error messages name the call relative to the site: shorter, and the site
+        # LUID stays out of console output and run notes.
+        prefix = f"/api/{self.api_version}/sites/{self.site_luid}"
+        if self.site_luid is not None and url.startswith(prefix):
+            return url[len(prefix) :] or "/"
+        return url
 
     # -- public request surface ----------------------------------------------------
 

@@ -47,7 +47,7 @@ from tca.modules.metadata import MetadataModule  # noqa: F401  (registers itself
 from tca.modules.permissions import PermissionsModule  # noqa: F401  (registers itself)
 from tca.modules.rest_core import RestCoreModule  # noqa: F401  (registers itself)
 from tca.normalize import normalize_run
-from tca.pseudo.scrubber import Scrubber, ScrubError, redact_pii
+from tca.pseudo.scrubber import Scrubber, ScrubError, redact_luids, redact_pii
 from tca.sources.metadata import MetadataApi
 from tca.sources.rest import TableauRest
 from tca.sources.vds import VizqlDataService
@@ -838,7 +838,8 @@ def diagnostics(
             text = _render_diag_markdown(report)
         else:
             text = _render_diag_text(report)
-        text = redact_pii(text, known)  # final self-gate: never emit PII, whatever the source
+        # final self-gate: never emit PII or any LUID, whatever the source
+        text = redact_luids(redact_pii(text, known))
         if output is not None:
             output.write_text(text + "\n", encoding="utf-8")
             console.print(f"[green]✓[/green] wrote diagnostics to {output}")

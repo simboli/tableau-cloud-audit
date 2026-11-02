@@ -203,6 +203,14 @@ def test_redact_pii_helper() -> None:
     assert "NA" in out  # degenerate non-UUID token left alone — no pathological redaction
 
 
+def test_redact_luids_catches_every_uuid_shape() -> None:
+    from tca.pseudo.scrubber import redact_luids
+
+    content_luid = "bc68fadc-2e61-43fc-bce4-6561461d2054"  # not a known user
+    out = redact_luids(f"skipped: /workbooks/{content_luid}/permissions (run 3, U-0001)")
+    assert out == "skipped: /workbooks/[redacted-luid]/permissions (run 3, U-0001)"
+
+
 def test_connection_username_is_redacted(scrubber: Scrubber) -> None:
     payload = {
         "connections": {

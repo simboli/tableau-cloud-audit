@@ -246,17 +246,23 @@ def test_diagnostics_scrubs_pii_from_notes(workdir: Path) -> None:
 
     write_config(workdir)
     luid = "aa11bb22-0000-1111-2222-333344445555"
+    content = "bc68fadc-2e61-43fc-bce4-6561461d2054"  # a workbook, not a known user
     with PackageStore(workdir / "acme.duckdb") as store:
         store.init_file_info("luid-1", "acme", "10ax")
         rid = store.begin_run(modules=["rest_core"])
         store.upsert_identity(rid, luid)  # now a known LUID
         store.write_response(rid, "/users", {"a": 1})
-        store.finish_run(rid, "partial", notes=f"crash contacting mario.rossi@acme.it at {luid}")
+        store.finish_run(
+            rid,
+            "partial",
+            notes=f"crash contacting mario.rossi@acme.it at {luid} on /workbooks/{content}/x",
+        )
 
     result = runner.invoke(app, ["diagnostics"])
     assert result.exit_code == 0, result.output
     assert "mario.rossi@acme.it" not in result.output
     assert luid not in result.output
+    assert content not in result.output  # no LUID of any kind, not just users
     assert "[redacted-email]" in result.output
     assert "[redacted-luid]" in result.output
     assert "file storage v1.0.0+" in result.output  # next to the duckdb version

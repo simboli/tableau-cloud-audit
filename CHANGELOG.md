@@ -10,6 +10,17 @@ test). Schema versions are tracked independently in `meta.schema_migrations`.
 
 ## [Unreleased]
 
+### Fixed
+
+- **No LUID reaches `tca diagnostics` through an error message any more.**
+  v0.2.2 started naming the failing call in HTTP errors by its full path,
+  which carries the site LUID: a stopped run kept it in its notes, and
+  `tca diagnostics` printed those notes (as well as the workbook LUID of any
+  skipped item) despite promising no LUIDs. Error messages now name the call
+  relative to the site (`GET /workbooks/<id>/permissions`), and the report
+  redacts every LUID-shaped string, not only known user LUIDs — including
+  notes already written by v0.2.2.
+
 ## [0.2.2] — 2026-11-02
 
 ### Fixed

@@ -51,6 +51,13 @@ def redact_pii(text: str, known_luids: Iterable[str]) -> str:
     return redacted
 
 
+def redact_luids(text: str) -> str:
+    """Redact EVERY UUID-shaped string — user, content or site LUID — from text
+    that never needs one. ``tca diagnostics`` promises no LUIDs at all, while a
+    run note may quote the call that failed (e.g. a workbook's permissions path)."""
+    return _LUID_RE.sub("[redacted-luid]", text)
+
+
 # Admin Insights uses the literal string "NA" in a LUID column when the row has
 # no user (e.g. a group grantee in the Permissions datasource). It is NOT a user
 # LUID: pseudonymising it would poison the identity vault with a 2-char token and

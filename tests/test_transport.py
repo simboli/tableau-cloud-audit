@@ -99,11 +99,9 @@ def test_gives_up_after_max_attempts(httpx_mock: HTTPXMock) -> None:
         httpx_mock.add_response(url=url, status_code=503)
     client = make_client()
     client.connect()
-    with pytest.raises(
-        TransportError,
-        match=f"Giving up after 5 attempts on GET /api/3.26/sites/{SITE_LUID}/groups:",
-    ):
+    with pytest.raises(TransportError, match="Giving up after 5 attempts on GET /groups:") as exc:
         list(client.paginate("/groups"))
+    assert SITE_LUID not in str(exc.value)  # site-relative: no site LUID in messages or notes
 
 
 def test_401_triggers_silent_reauth_once(httpx_mock: HTTPXMock) -> None:
@@ -147,7 +145,7 @@ def test_tableau_error_body_is_surfaced(httpx_mock: HTTPXMock) -> None:
     )
     client = make_client()
     client.connect()
-    with pytest.raises(TransportError, match="GET /api/.*/groups: .*404005.*Resource Not Found"):
+    with pytest.raises(TransportError, match="GET /groups: .*404005.*Resource Not Found"):
         list(client.paginate("/groups"))
 
 
