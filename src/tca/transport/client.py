@@ -123,7 +123,8 @@ class RestClient:
                 attempt += 1
                 if attempt >= MAX_ATTEMPTS:
                     raise TransportError(
-                        f"Giving up after {MAX_ATTEMPTS} attempts: {_describe(response)}",
+                        f"Giving up after {MAX_ATTEMPTS} attempts on {method} {url}: "
+                        f"{_describe(response)}",
                         status_code=response.status_code,
                     )
                 self._sleep(_backoff_seconds(response, attempt))
@@ -136,7 +137,7 @@ class RestClient:
                 continue
 
             if response.status_code >= 400:
-                message = _describe(response)
+                message = f"{method} {url}: {_describe(response)}"
                 if not authed and "signin" in url:
                     message += (
                         " — sign-in failed: check the PAT name, the TCA_PAT_SECRET "

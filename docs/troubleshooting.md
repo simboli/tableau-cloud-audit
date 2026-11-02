@@ -131,11 +131,25 @@ continues the interrupted run, skipping what was collected — including the
 per-item API calls. A new `tca collect` (without `--resume`) instead starts a
 fresh run and marks the interrupted one `aborted`.
 
-### "⚠ N item(s) refused a permissions query (403/404) and were skipped"
+### "⚠ N item(s) refused the query (403/404) and were skipped"
 
 Expected. Some content — typically **Personal Space** workbooks — refuses
 permission queries even to site administrators. The items are counted in the
 run notes and skipped; everything else proceeds.
+
+### "⚠ N item(s) kept failing with a server error (5xx) and were skipped"
+
+Tableau answered a per-item call (a permissions or connections query on one
+workbook or data source) with a server error on every retry. It is a fault on
+Tableau's side tied to that item — seen live on a **Personal Space** workbook,
+which answered `500` instead of `403` — so the collector skips it, lists the
+failed calls under the warning and in the run notes, and finishes the run.
+Skipped items are not stored, so the next `tca collect` asks for them again.
+
+If **three items in a row** fail this way, the collector stops instead: that
+pattern means Tableau itself is failing, and a run marked `ok` with whole
+loops missing would be worse than no run. The run stays resumable — retry
+later with `tca collect --resume`.
 
 ### "⚠ Admin Insights datasources not found …"
 

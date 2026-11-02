@@ -18,6 +18,7 @@ from tca.sources.metadata import MetadataApi
 from tca.sources.rest import TableauRest
 from tca.sources.vds import VizqlDataService
 from tca.storage.writer import PackageStore
+from tca.transport.client import TransportError
 
 # The module set that runs when neither --modules nor [collect] modules is given.
 # Single source of truth for the default selection (the CLI option and the config
@@ -80,6 +81,8 @@ class ModuleStats:
     pages: dict[str, int] = field(default_factory=dict)
     skipped: int = 0  # units already landed before this run attempt (resume)
     denied: list[tuple[str, str]] = field(default_factory=list)  # (endpoint, entity_luid)
+    failed: list[tuple[str, str]] = field(default_factory=list)  # 5xx after retries
+    failure_streak: int = 0  # consecutive per-item server errors
 
     def count(self, endpoint: str, written: bool) -> None:
         if written:
@@ -89,6 +92,57 @@ class ModuleStats:
 
     def count_denied(self, endpoint: str, entity_luid: str) -> None:
         self.denied.append((endpoint, entity_luid))
+
+    def count_failed(self, endpoint: str, entity_luid: str) -> None:
+        self.failed.append((endpoint, entity_luid))
+
+
+# One item answering 5xx after every retry is a fault of that item (seen live:
+# a Personal Space workbook answering 500 to its permissions query) and is
+# skipped. This many in a row means Tableau itself is failing: the run aborts,
+# resumable, instead of finishing "ok" with whole loops missing.
+MAX_CONSECUTIVE_ITEM_FAILURES = 3
+
+
+def land_item(
+    ctx: RunContext,
+    stats: ModuleStats,
+    endpoint: str,
+    entity_luid: str,
+    fetch: Callable[[str], dict[str, Any]],
+) -> None:
+    """Fetch + land one per-item page.
+
+    403/404 on a single item is a property of the site (e.g. Personal Space
+    content refuses permission queries even to admins) — counted as denied and
+    skipped. A server error that outlives the transport retries is counted as
+    failed and skipped, up to MAX_CONSECUTIVE_ITEM_FAILURES in a row. Any other
+    error aborts the run (resumable). Skipped items never land, so the next
+    collect retries them.
+    """
+    if ctx.is_done(endpoint, entity_luid):
+        stats.count(endpoint, written=False)
+        return
+    try:
+        payload = fetch(entity_luid)
+    except TransportError as exc:
+        if exc.status_code in (403, 404):
+            stats.failure_streak = 0
+            stats.count_denied(endpoint, entity_luid)
+            return
+        if exc.status_code is not None and exc.status_code >= 500:
+            stats.failure_streak += 1
+            if stats.failure_streak >= MAX_CONSECUTIVE_ITEM_FAILURES:
+                raise TransportError(
+                    f"{stats.failure_streak} items in a row failed with a server error — "
+                    f"Tableau looks unavailable, stopping. Last: {exc}",
+                    status_code=exc.status_code,
+                ) from exc
+            stats.count_failed(endpoint, entity_luid)
+            return
+        raise
+    stats.failure_streak = 0
+    stats.count(endpoint, ctx.land(endpoint, payload, entity_luid=entity_luid))
 
 
 class Module(Protocol):

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from tca.modules.base import ModuleStats, RunContext, register
+from tca.modules.base import ModuleStats, RunContext, land_item, register
 from tca.sources.rest import (
     DATASOURCE_CONNECTIONS,
     DATASOURCES,
@@ -47,23 +47,13 @@ class ContentModule:
 
         # per-item calls last: the expensive loop, and the resume sweet spot
         for workbook_luid in ctx.track(workbook_luids, "workbook connections"):
-            if ctx.is_done(WORKBOOK_CONNECTIONS, workbook_luid):
-                stats.count(WORKBOOK_CONNECTIONS, written=False)
-                continue
-            payload = ctx.rest.workbook_connections(workbook_luid)
-            stats.count(
-                WORKBOOK_CONNECTIONS,
-                ctx.land(WORKBOOK_CONNECTIONS, payload, entity_luid=workbook_luid),
+            land_item(
+                ctx, stats, WORKBOOK_CONNECTIONS, workbook_luid, ctx.rest.workbook_connections
             )
 
         for datasource_luid in ctx.track(datasource_luids, "datasource connections"):
-            if ctx.is_done(DATASOURCE_CONNECTIONS, datasource_luid):
-                stats.count(DATASOURCE_CONNECTIONS, written=False)
-                continue
-            payload = ctx.rest.datasource_connections(datasource_luid)
-            stats.count(
-                DATASOURCE_CONNECTIONS,
-                ctx.land(DATASOURCE_CONNECTIONS, payload, entity_luid=datasource_luid),
+            land_item(
+                ctx, stats, DATASOURCE_CONNECTIONS, datasource_luid, ctx.rest.datasource_connections
             )
 
         return stats

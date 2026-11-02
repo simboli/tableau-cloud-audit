@@ -3,6 +3,7 @@
 from pathlib import Path
 from typing import Any
 
+import httpx
 import pytest
 from pytest_httpx import HTTPXMock
 
@@ -73,11 +74,13 @@ def test_crash_then_resume_completes_without_duplicates(
     store = PackageStore(tmp_path / "pkg.duckdb").open()
     module = ContentModule()
 
-    # ---- first attempt: wb-1 connections OK, wb-2 fails hard (5xx to exhaustion)
+    # ---- first attempt: wb-1 connections OK, then the network drops on wb-2
+    # (a per-item 5xx would be skipped, not fatal — see test_permissions)
     mock_listings(httpx_mock)
     httpx_mock.add_response(url=f"{API}/workbooks/wb-1/connections", json=connections("c-1"))
-    for _ in range(5):
-        httpx_mock.add_response(url=f"{API}/workbooks/wb-2/connections", status_code=503)
+    httpx_mock.add_exception(
+        httpx.ReadTimeout("connection dropped"), url=f"{API}/workbooks/wb-2/connections"
+    )
 
     run_id = store.begin_run(modules=["content"])
     ctx = RunContext(

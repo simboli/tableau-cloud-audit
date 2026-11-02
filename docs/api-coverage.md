@@ -59,7 +59,7 @@ in the pseudonymisation manifest (`pseudo/manifest.py`) before they can be calle
 | `/api/{v}/sites/{site}/projects/{id}/permissions` | GET (per project) | Explicit project-level rules | **yes** (user grantees → U-####; group grantees in clear) | ✅ implemented (`permissions` module) |
 | `/api/{v}/sites/{site}/projects/{id}/default-permissions/workbooks` | GET (per project) | Default templates children inherit — where "All Users" hides | **yes** (same) | ✅ implemented (`permissions` module) |
 | `/api/{v}/sites/{site}/projects/{id}/default-permissions/datasources` | GET (per project) | Same, datasource template | **yes** (same) | ✅ implemented (`permissions` module) |
-| `/api/{v}/sites/{site}/workbooks/{id}/permissions` | GET (per item — expensive!) | Content-level rules; 403/404 (Personal Space) skipped + counted | **yes** (same) | ✅ implemented (`permissions` module) |
+| `/api/{v}/sites/{site}/workbooks/{id}/permissions` | GET (per item — expensive!) | Content-level rules; 403/404 (Personal Space) skipped + counted; a persistent 5xx is skipped + listed | **yes** (same) | ✅ implemented (`permissions` module) |
 | `/api/{v}/sites/{site}/datasources/{id}/permissions` | GET (per item) | Content-level rules | **yes** (same) | ✅ implemented (`permissions` module) |
 | View / flow permissions + flow default templates | GET (per item) | Remaining permission surfaces | **yes** | 💤 backlog |
 

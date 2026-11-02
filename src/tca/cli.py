@@ -371,6 +371,7 @@ def collect(
                 all_stats: dict[str, int] = {}
                 skipped = 0
                 denied: list[tuple[str, str]] = []
+                failed: list[tuple[str, str]] = []
                 try:
                     with progress:
                         for module in selected:
@@ -379,6 +380,7 @@ def collect(
                             all_stats.update(stats.pages)
                             skipped += stats.skipped
                             denied.extend(stats.denied)
+                            failed.extend(stats.failed)
                 except KeyboardInterrupt:
                     store.finish_run(run_id, "partial", notes="interrupted by user")
                     console.print(
@@ -396,10 +398,18 @@ def collect(
                 console.print("[bold]→ normalizing raw pages into state tables[/bold]")
                 state_counts = normalize_run(store, run_id)
 
-                notes = None
+                failed_calls = [endpoint.replace("{luid}", luid) for endpoint, luid in failed]
+                notes_parts = []
                 if denied:
-                    notes = f"{len(denied)} item(s) denied (403/404), e.g. Personal Space content"
-                store.finish_run(run_id, "ok", notes=notes)
+                    notes_parts.append(
+                        f"{len(denied)} item(s) denied (403/404), e.g. Personal Space content"
+                    )
+                if failed:
+                    shown = ", ".join(failed_calls[:5]) + (", …" if len(failed) > 5 else "")
+                    notes_parts.append(
+                        f"{len(failed)} item(s) skipped after repeated server errors: {shown}"
+                    )
+                store.finish_run(run_id, "ok", notes="; ".join(notes_parts) or None)
                 pruned = store.prune_raw(cfg.retention.raw_days, keep_run_id=run_id)
                 if pruned:
                     console.print(
@@ -410,10 +420,18 @@ def collect(
                     console.print(f"[dim]{skipped} already-collected pages skipped (resume)[/dim]")
                 if denied:
                     console.print(
-                        f"[yellow]⚠ {len(denied)} item(s) refused a permissions query "
+                        f"[yellow]⚠ {len(denied)} item(s) refused the query "
                         "(403/404) and were skipped — typical for Personal Space "
                         "content; recorded in the run notes.[/yellow]"
                     )
+                if failed:
+                    console.print(
+                        f"[yellow]⚠ {len(failed)} item(s) kept failing with a server "
+                        "error (5xx) and were skipped — a Tableau-side fault on those "
+                        "items; the next collect retries them:[/yellow]"
+                    )
+                    for call in failed_calls:
+                        console.print(f"[yellow]    {call}[/yellow]")
                 if state_counts:
                     state_table = Table(title="typed state (rebuilt from raw)")
                     state_table.add_column("table")

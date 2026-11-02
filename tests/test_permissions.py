@@ -12,7 +12,7 @@ from tca.pseudo.scrubber import Scrubber
 from tca.sources.rest import TableauRest
 from tca.storage.writer import PackageStore
 from tca.transport.auth import Credentials
-from tca.transport.client import RestClient
+from tca.transport.client import MAX_ATTEMPTS, RestClient, TransportError
 
 BASE = "https://test-pod.online.tableau.com"
 SITE_LUID = "site-luid-1"
@@ -56,7 +56,8 @@ def connected(httpx_mock: HTTPXMock, tmp_path: Path):
         json={"credentials": {"token": "tok", "site": {"id": SITE_LUID, "contentUrl": "acme"}}},
     )
     client = RestClient(
-        Credentials.build(pod="test-pod", site="acme", pat_name="n", pat_secret="s")
+        Credentials.build(pod="test-pod", site="acme", pat_name="n", pat_secret="s"),
+        sleep=lambda _: None,
     )
     client.connect()
     store = PackageStore(tmp_path / "pkg.duckdb").open()
@@ -167,3 +168,84 @@ def test_403_on_single_item_is_skipped_not_fatal(httpx_mock: HTTPXMock, connecte
 
     assert stats.denied == [("/workbooks/{luid}/permissions", "wb-personal")]
     assert stats.pages["/workbooks/{luid}/permissions"] == 1  # the accessible one landed
+
+
+def mock_workbook_listings(httpx_mock: HTTPXMock, *workbook_luids: str) -> None:
+    httpx_mock.add_response(
+        url=f"{API}/projects?pageSize=1000&pageNumber=1", json=page("projects", "project", [])
+    )
+    httpx_mock.add_response(
+        url=f"{API}/workbooks?fields=_all_&pageSize=1000&pageNumber=1",
+        json=page("workbooks", "workbook", [{"id": luid} for luid in workbook_luids]),
+    )
+    httpx_mock.add_response(
+        url=f"{API}/datasources?fields=_all_&pageSize=1000&pageNumber=1",
+        json=page("datasources", "datasource", []),
+    )
+
+
+def fail_every_attempt(httpx_mock: HTTPXMock, workbook_luid: str) -> None:
+    for _ in range(MAX_ATTEMPTS):
+        httpx_mock.add_response(
+            url=f"{API}/workbooks/{workbook_luid}/permissions",
+            status_code=500,
+            json={"error": {"code": "500000", "summary": "Internal Server Error"}},
+        )
+
+
+def succeed(httpx_mock: HTTPXMock, workbook_luid: str) -> None:
+    httpx_mock.add_response(
+        url=f"{API}/workbooks/{workbook_luid}/permissions",
+        json=permissions_payload("workbook", workbook_luid),
+    )
+
+
+def run_module(client: RestClient, store: PackageStore):
+    run_id = store.begin_run(modules=["permissions"])
+    ctx = RunContext(
+        rest=TableauRest(client), store=store, scrubber=Scrubber(store, run_id), run_id=run_id
+    )
+    return PermissionsModule().run(ctx)
+
+
+def test_persistent_5xx_on_single_item_is_skipped_not_fatal(
+    httpx_mock: HTTPXMock, connected
+) -> None:
+    # seen live: a Personal Space workbook answering 500 to its permissions query
+    client, store = connected
+    mock_workbook_listings(httpx_mock, "wb-personal", "wb-ok")
+    fail_every_attempt(httpx_mock, "wb-personal")
+    succeed(httpx_mock, "wb-ok")
+
+    stats = run_module(client, store)  # must NOT raise
+
+    assert stats.failed == [("/workbooks/{luid}/permissions", "wb-personal")]
+    assert stats.pages["/workbooks/{luid}/permissions"] == 1
+    landed = store.con.execute(
+        "SELECT count(*) FROM raw.api_responses WHERE entity_luid = 'wb-personal'"
+    ).fetchone()[0]
+    assert landed == 0  # never landed, so the next collect retries it
+
+
+def test_consecutive_5xx_items_abort_the_run(httpx_mock: HTTPXMock, connected) -> None:
+    client, store = connected
+    mock_workbook_listings(httpx_mock, "wb-1", "wb-2", "wb-3")
+    for luid in ("wb-1", "wb-2", "wb-3"):
+        fail_every_attempt(httpx_mock, luid)
+
+    with pytest.raises(TransportError, match="3 items in a row failed") as excinfo:
+        run_module(client, store)
+    assert "/workbooks/wb-3/permissions" in str(excinfo.value)
+
+
+def test_a_success_resets_the_5xx_streak(httpx_mock: HTTPXMock, connected) -> None:
+    client, store = connected
+    mock_workbook_listings(httpx_mock, "wb-1", "wb-2", "wb-3", "wb-4", "wb-5")
+    for luid in ("wb-1", "wb-2", "wb-4", "wb-5"):
+        fail_every_attempt(httpx_mock, luid)
+    succeed(httpx_mock, "wb-3")
+
+    stats = run_module(client, store)
+
+    assert [luid for _, luid in stats.failed] == ["wb-1", "wb-2", "wb-4", "wb-5"]
+    assert stats.pages["/workbooks/{luid}/permissions"] == 1

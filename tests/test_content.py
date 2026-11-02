@@ -12,7 +12,7 @@ from tca.pseudo.scrubber import Scrubber
 from tca.sources.rest import TableauRest
 from tca.storage.writer import PackageStore
 from tca.transport.auth import Credentials
-from tca.transport.client import RestClient
+from tca.transport.client import MAX_ATTEMPTS, RestClient
 
 BASE = "https://test-pod.online.tableau.com"
 SITE_LUID = "site-luid-1"
@@ -38,7 +38,7 @@ def connected(httpx_mock: HTTPXMock, tmp_path: Path):
         json={"credentials": {"token": "tok", "site": {"id": SITE_LUID, "contentUrl": "acme"}}},
     )
     creds = Credentials.build(pod="test-pod", site="acme", pat_name="n", pat_secret="s")
-    client = RestClient(creds)
+    client = RestClient(creds, sleep=lambda _: None)
     client.connect()
     store = PackageStore(tmp_path / "pkg.duckdb").open()
     yield client, store
@@ -172,3 +172,38 @@ def test_content_module_lands_all_endpoints(httpx_mock: HTTPXMock, connected) ->
         "WHERE payload::VARCHAR ILIKE '%mario%' OR payload::VARCHAR ILIKE '%svc.tableau%'"
     ).fetchone()[0]
     assert leaked == 0
+
+
+def test_persistent_5xx_on_one_connections_call_is_skipped(
+    httpx_mock: HTTPXMock, connected
+) -> None:
+    client, store = connected
+    httpx_mock.add_response(
+        url=f"{API}/projects?pageSize=1000&pageNumber=1", json=page("projects", "project", [])
+    )
+    httpx_mock.add_response(
+        url=f"{API}/workbooks?fields=_all_&pageSize=1000&pageNumber=1",
+        json=page("workbooks", "workbook", [{"id": "wb-broken"}, {"id": "wb-ok"}]),
+    )
+    httpx_mock.add_response(
+        url=f"{API}/views?includeUsageStatistics=true&pageSize=1000&pageNumber=1",
+        json=page("views", "view", []),
+    )
+    httpx_mock.add_response(
+        url=f"{API}/datasources?fields=_all_&pageSize=1000&pageNumber=1",
+        json=page("datasources", "datasource", []),
+    )
+    for _ in range(MAX_ATTEMPTS):
+        httpx_mock.add_response(url=f"{API}/workbooks/wb-broken/connections", status_code=503)
+    httpx_mock.add_response(
+        url=f"{API}/workbooks/wb-ok/connections", json={"connections": {"connection": []}}
+    )
+
+    run_id = store.begin_run(modules=["content"])
+    ctx = RunContext(
+        rest=TableauRest(client), store=store, scrubber=Scrubber(store, run_id), run_id=run_id
+    )
+    stats = ContentModule().run(ctx)
+
+    assert stats.failed == [("/workbooks/{luid}/connections", "wb-broken")]
+    assert stats.pages["/workbooks/{luid}/connections"] == 1

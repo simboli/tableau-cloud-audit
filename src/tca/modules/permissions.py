@@ -12,10 +12,9 @@ ctx.land() skips the duplicate write and the payload is only parsed for IDs.
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from typing import Any
 
-from tca.modules.base import ModuleStats, RunContext, register
+from tca.modules.base import ModuleStats, RunContext, land_item, register
 from tca.sources.rest import (
     DATASOURCE_PERMISSIONS,
     DATASOURCES,
@@ -26,7 +25,6 @@ from tca.sources.rest import (
     WORKBOOK_PERMISSIONS,
     WORKBOOKS,
 )
-from tca.transport.client import TransportError
 
 
 class PermissionsModule:
@@ -63,45 +61,19 @@ class PermissionsModule:
         ]
         for project_luid in ctx.track(project_luids, "project permissions"):
             for endpoint, fetch in per_project:
-                _land_item(ctx, stats, endpoint, project_luid, fetch)
+                land_item(ctx, stats, endpoint, project_luid, fetch)
 
         for workbook_luid in ctx.track(workbook_luids, "workbook permissions"):
-            _land_item(
+            land_item(
                 ctx, stats, WORKBOOK_PERMISSIONS, workbook_luid, ctx.rest.workbook_permissions
             )
 
         for datasource_luid in ctx.track(datasource_luids, "datasource permissions"):
-            _land_item(
+            land_item(
                 ctx, stats, DATASOURCE_PERMISSIONS, datasource_luid, ctx.rest.datasource_permissions
             )
 
         return stats
-
-
-def _land_item(
-    ctx: RunContext,
-    stats: ModuleStats,
-    endpoint: str,
-    entity_luid: str,
-    fetch: Callable[[str], dict[str, Any]],
-) -> None:
-    """Fetch + land one per-item permissions page.
-
-    403/404 on a single item is a property of the site (e.g. Personal Space
-    content refuses permission queries even to admins) — counted and skipped,
-    never fatal. Any other error still aborts the run (resumable).
-    """
-    if ctx.is_done(endpoint, entity_luid):
-        stats.count(endpoint, written=False)
-        return
-    try:
-        payload = fetch(entity_luid)
-    except TransportError as exc:
-        if exc.status_code in (403, 404):
-            stats.count_denied(endpoint, entity_luid)
-            return
-        raise
-    stats.count(endpoint, ctx.land(endpoint, payload, entity_luid=entity_luid))
 
 
 def _item_ids(payload: dict[str, Any], block: str, singular: str) -> list[str]:

@@ -12,6 +12,16 @@ test). Schema versions are tracked independently in `meta.schema_migrations`.
 
 ### Fixed
 
+- **One broken item no longer stops the whole collection.** A Personal Space
+  workbook that answered its permissions query with HTTP 500 (instead of the
+  403 Tableau used to send) aborted the run on every `--resume`, so the
+  `permissions`, `activity` and `metadata` modules never ran. A per-item call
+  (permissions or connections) that keeps failing with a server error after
+  the retries is now skipped, listed in the console and in the run notes, and
+  retried on the next collect. Three such items in a row still stop the run,
+  resumable: that pattern means Tableau itself is failing.
+- **HTTP errors now name the failing call** (`GET /api/…/workbooks/<id>/permissions`),
+  so a stopped run says which endpoint and which item broke it.
 - **The "embedded credentials" cookbook recipe returned no rows after a
   partial run.** It still filtered `state.connections` on the latest ok run,
   a leftover from before state became current-only (v0.8): after a run that

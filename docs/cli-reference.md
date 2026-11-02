@@ -81,7 +81,9 @@ Modules:
 Behavior worth knowing: runs are recorded with a status (`ok` complete ·
 `partial` interrupted, resumable · `aborted` superseded by a newer run);
 per-item 403/404 (e.g. Personal Space content) are skipped and counted, never
-fatal; starting a fresh collect marks leftover interrupted runs as aborted
+fatal; a per-item server error that outlives the retries is skipped, listed
+and retried on the next collect, unless three items in a row fail (then the
+run stops, resumable); starting a fresh collect marks leftover interrupted runs as aborted
 and says so.
 
 ## `tca summary`
