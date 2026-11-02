@@ -23,3 +23,6 @@ collector.toml
 .idea/
 .vscode/
 site/
+
+# Maintainer-only notes for the AI assistant — local, never published
+CLAUDE.md
