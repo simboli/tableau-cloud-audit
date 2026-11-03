@@ -49,13 +49,17 @@ class RestClient:
         *,
         timeout: float = 30.0,
         sleep: Callable[[float], None] = time.sleep,
+        transport: httpx.BaseTransport | None = None,
     ) -> None:
         self._creds = creds
         self._sleep = sleep
+        # transport: None = real network. Tests and benchmarks inject an
+        # httpx.MockTransport to drive the full client against a fake Tableau.
         self._http = httpx.Client(
             base_url=creds.server,
             timeout=timeout,
             headers={"Accept": "application/json", "User-Agent": f"tca/{__version__}"},
+            transport=transport,
         )
         self._token: str | None = None
         self.api_version: str | None = None

@@ -2,6 +2,7 @@
 
 from typing import Any
 
+import httpx
 import pytest
 from pytest_httpx import HTTPXMock
 
@@ -158,6 +159,32 @@ def test_signout_clears_token(httpx_mock: HTTPXMock) -> None:
     client.signout()
     with pytest.raises(TransportError, match="Not signed in"):
         client.get_site("/groups")
+
+
+def test_injected_transport_serves_every_request() -> None:
+    # no httpx_mock: the injected transport alone must answer (benchmarks
+    # drive the real client against a fake Tableau this way)
+    seen: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request.url.path)
+        if request.url.path.endswith("/serverinfo"):
+            return httpx.Response(200, json={"serverInfo": {"restApiVersion": "3.26"}})
+        if request.url.path.endswith("/auth/signin"):
+            return httpx.Response(
+                200, json={"credentials": {"token": "tok-1", "site": {"id": SITE_LUID}}}
+            )
+        return httpx.Response(200, json=users_page(1, 1, 1000, "u1"))
+
+    creds = Credentials.build(pod="test-pod", site="acme", pat_name="n", pat_secret="s")
+    client = RestClient(creds, transport=httpx.MockTransport(handler))
+    client.connect()
+    assert [page for _, page in client.paginate("/users")] == [users_page(1, 1, 1000, "u1")]
+    assert seen == [
+        "/api/3.4/serverinfo",
+        "/api/3.26/auth/signin",
+        f"/api/3.26/sites/{SITE_LUID}/users",
+    ]
 
 
 def test_credentials_repr_hides_secret() -> None:
