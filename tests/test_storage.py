@@ -144,6 +144,30 @@ def test_export_pins_storage_version(tmp_path: Path) -> None:
     assert storage_version(dest) == f"{writer.STORAGE_VERSION}+"
 
 
+def test_export_compresses_raw_payloads(tmp_path: Path) -> None:
+    # under the v1.0.0 pin the raw JSON was stored uncompressed: exports came
+    # out 3-4x larger than the encrypted source (measured by tca-bench)
+    with PackageStore(tmp_path / "pkg.duckdb", encryption_key="s3cret") as s:
+        s.init_file_info("luid-1", "acme", None)
+        run_id = s.begin_run(modules=["metadata"])
+        for page in range(1, 6):
+            nodes = [{"id": f"node-{page}-{i}", "name": f"Field {i}"} for i in range(2_000)]
+            s.write_response(run_id, "graphql:workbooks", {"nodes": nodes}, page=page)
+        s.finish_run(run_id, "ok")
+        dest = tmp_path / "export.duckdb"
+        s.export_redacted(dest)
+    con = duckdb.connect(str(dest), read_only=True)
+    codecs = {
+        row[0]
+        for row in con.execute(
+            "SELECT compression FROM pragma_storage_info('raw.api_responses') "
+            "WHERE column_name = 'payload' AND segment_type <> 'VALIDITY'"
+        ).fetchall()
+    }
+    con.close()
+    assert codecs and "Uncompressed" not in codecs
+
+
 @pytest.mark.usefixtures("newest_storage_by_default")
 def test_new_encrypted_package_file_is_not_pinned(tmp_path: Path) -> None:
     # encryption sets its own format; combining it with the pin is rejected by duckdb

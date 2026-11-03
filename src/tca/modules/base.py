@@ -83,6 +83,7 @@ class ModuleStats:
     denied: list[tuple[str, str]] = field(default_factory=list)  # (endpoint, entity_luid)
     failed: list[tuple[str, str]] = field(default_factory=list)  # 5xx after retries
     failure_streak: int = 0  # consecutive per-item server errors
+    personal_space: int = 0  # Personal Space workbooks whose permissions were not queried
 
     def count(self, endpoint: str, written: bool) -> None:
         if written:

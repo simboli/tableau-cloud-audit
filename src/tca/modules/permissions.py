@@ -2,7 +2,8 @@
 project default-permission templates children inherit.
 
 This is the most expensive loop in the collector (one call per project ×3,
-plus one per workbook and per datasource) — it runs last by convention and
+plus one per workbook outside Personal Space and one per datasource) — it runs
+last by convention and
 leans on resume: already-landed items are skipped without an API call.
 
 The module is self-sufficient: it re-fetches the cheap listings to learn the
@@ -40,9 +41,11 @@ class PermissionsModule:
             project_luids.extend(_item_ids(payload, "projects", "project"))
 
         workbook_luids: list[str] = []
+        personal_luids: set[str] = set()
         for page, payload in ctx.rest.workbooks():
             stats.count(WORKBOOKS, ctx.land(WORKBOOKS, payload, page=page))
             workbook_luids.extend(_item_ids(payload, "workbooks", "workbook"))
+            personal_luids.update(_personal_space_ids(payload))
 
         datasource_luids: list[str] = []
         for page, payload in ctx.rest.datasources():
@@ -63,7 +66,13 @@ class PermissionsModule:
             for endpoint, fetch in per_project:
                 land_item(ctx, stats, endpoint, project_luid, fetch)
 
-        for workbook_luid in ctx.track(workbook_luids, "workbook permissions"):
+        # Personal Space workbooks are never queried: that content cannot be
+        # shared, so it has no explicit rules, and Tableau Cloud refuses the call
+        # (403, and 500 since 2026-11). Each refusal used to cost the full retry
+        # backoff (~15 s), and three in a row aborted the run.
+        queryable = [luid for luid in workbook_luids if luid not in personal_luids]
+        stats.personal_space = len(workbook_luids) - len(queryable)
+        for workbook_luid in ctx.track(queryable, "workbook permissions"):
             land_item(
                 ctx, stats, WORKBOOK_PERMISSIONS, workbook_luid, ctx.rest.workbook_permissions
             )
@@ -81,6 +90,19 @@ def _item_ids(payload: dict[str, Any], block: str, singular: str) -> list[str]:
     if isinstance(items, dict):  # single-object shape
         items = [items]
     return [i["id"] for i in items if isinstance(i, dict) and "id" in i]
+
+
+def _personal_space_ids(payload: dict[str, Any]) -> list[str]:
+    items = payload.get("workbooks", {}).get("workbook", [])
+    if isinstance(items, dict):  # single-object shape
+        items = [items]
+    return [
+        i["id"]
+        for i in items
+        if isinstance(i, dict)
+        and "id" in i
+        and (i.get("location") or {}).get("type") == "PersonalSpace"
+    ]
 
 
 register(PermissionsModule())

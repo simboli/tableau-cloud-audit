@@ -36,6 +36,11 @@ _EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 _LUID_RE = re.compile(
     r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
 )
+# Every UUID-shaped substring, overlapping ones included (zero-width lookahead):
+# one pass finds every occurrence a per-LUID substring search would, at a cost
+# independent of how many users the vault holds (that search was users × bytes,
+# hours per run on a 30k-user site).
+_LUID_SCAN_RE = re.compile(f"(?=({_LUID_RE.pattern}))")
 
 
 def redact_pii(text: str, known_luids: Iterable[str]) -> str:
@@ -210,8 +215,10 @@ class Scrubber:
                 f"'{endpoint}'. The PII manifest is likely missing a field for "
                 "this endpoint. Nothing was written."
             )
-        for luid in self._store.known_luids():
-            if _LUID_RE.fullmatch(luid) and luid in text:
+        known = self._store.known_luids()
+        for match in _LUID_SCAN_RE.finditer(text):
+            luid = match.group(1)
+            if luid in known:
                 raise ScrubError(
                     f"Safety net: known user LUID '{luid[:8]}…' survived scrubbing "
                     f"in '{endpoint}'. The PII manifest is likely missing a path "

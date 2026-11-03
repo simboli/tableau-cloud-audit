@@ -105,3 +105,43 @@ def test_export_verification_blocks_luid_leak(tmp_path: Path) -> None:
         store.export_redacted(dest)
     assert not dest.exists()
     store.close()
+
+
+LEAKED = "aa11bb22-0000-1111-2222-333344445555"
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        f"ff{LEAKED}ff",  # glued to more hex
+        # overlapping a UUID-shaped decoy (a non-overlapping scan would miss it)
+        f"00000000-0000-0000-0000-0000{LEAKED}",
+    ],
+)
+def test_export_verification_finds_luid_anywhere(tmp_path: Path, text: str) -> None:
+    store = make_populated_store(tmp_path / "pkg.duckdb")
+    run_id = store.begin_run(modules=["rest_core"])
+    store.upsert_identity(run_id, LEAKED)
+    store.write_response(run_id, "/x", {"a": text}, page=1)
+    store.write_response(run_id, "/x", {"b": text}, page=2)
+    with pytest.raises(StorageError, match=r"2 row\(s\) in 'raw.api_responses'"):
+        store.export_redacted(tmp_path / "export.duckdb")
+    store.close()
+
+
+def test_export_verification_ignores_unknown_uuids(tmp_path: Path) -> None:
+    # content LUIDs are UUID-shaped too, and legitimately exported
+    store = make_populated_store(tmp_path / "pkg.duckdb")
+    run_id = store.begin_run(modules=["rest_core"])
+    store.upsert_identity(run_id, LEAKED)
+    store.write_response(run_id, "/workbooks", {"id": "bb22cc33-0000-1111-2222-333344445555"})
+    store.finish_run(run_id, "ok")
+    store.export_redacted(tmp_path / "export.duckdb")  # must not raise
+    store.close()
+
+
+def test_export_and_safety_net_share_the_luid_shape() -> None:
+    from tca.pseudo import scrubber
+    from tca.storage import writer
+
+    assert scrubber._LUID_RE.pattern == writer._LUID_PATTERN

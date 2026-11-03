@@ -113,6 +113,33 @@ def test_safety_net_blocks_known_luid_leak(scrubber: Scrubber) -> None:
         scrubber.scrub("/groups", leak)
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        "see https://x/#/user/aa11bb22-0000-1111-2222-333344445555/content",  # inside a URL
+        "ffaa11bb22-0000-1111-2222-333344445555ff",  # glued to more hex
+        # overlapping a UUID-shaped decoy: a non-overlapping scan matches the
+        # decoy, consumes the LUID's first 8 chars and misses it
+        "00000000-0000-0000-0000-0000aa11bb22-0000-1111-2222-333344445555",
+    ],
+)
+def test_safety_net_finds_known_luid_anywhere_in_text(scrubber: Scrubber, text: str) -> None:
+    scrubber.scrub("/users", USERS_PAGE)
+    with pytest.raises(ScrubError, match="aa11bb22"):
+        scrubber.scrub("/groups", {"groups": {"group": [{"id": "g-1", "name": text}]}})
+
+
+def test_safety_net_knows_users_vaulted_after_its_first_check(store: PackageStore) -> None:
+    # known LUIDs are cached per store: a user vaulted later must still be caught
+    run_id = store.begin_run(modules=["rest_core"])
+    scrubber = Scrubber(store, run_id)
+    scrubber.scrub("/groups", {"groups": {"group": [{"id": "g-1", "name": "Sales"}]}})
+    store.upsert_identity(run_id, user_luid="cc33dd44-0000-1111-2222-333344445555")
+    leak = {"groups": {"group": [{"id": "g-2", "name": "cc33dd44-0000-1111-2222-333344445555"}]}}
+    with pytest.raises(ScrubError, match="LUID"):
+        scrubber.scrub("/groups", leak)
+
+
 def test_safety_net_ignores_non_luid_vault_token(store: PackageStore) -> None:
     # Defense in depth: even if a degenerate (non-UUID) token reaches the vault,
     # the substring scan must skip it instead of matching innocuous fragments of

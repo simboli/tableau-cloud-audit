@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterator
+from collections.abc import Set as AbstractSet
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from importlib import resources
@@ -39,12 +40,19 @@ MIGRATIONS: tuple[tuple[str, str], ...] = (
 SCHEMA_VERSION = MIGRATIONS[-1][0]
 _CATALOG = "pkg"
 
+# A Tableau user LUID is a UUID — same shape as the scrubber's _LUID_RE (kept
+# equal by a test; importing it here would be circular).
+_LUID_PATTERN = "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
+
 # Storage format of every PLAIN file tca creates (exports, unencrypted package
 # files), so it does not depend on whichever duckdb pip resolved. Left alone,
 # duckdb 2.x writes its newest format, which no 1.x client (including most
 # installed DuckDB CLIs) can open — breaking `duckdb <file>` and, worse, the
 # export, whose whole point is to be opened on someone else's machine.
-# v1.0.0 = readable by any duckdb >= 1.0.
+# v1.2.0 = readable by any duckdb >= 1.2 (Feb 2025), and the first format that
+# compresses long strings (ZSTD). Under v1.0.0 the raw JSON payloads — most of
+# the file — were stored uncompressed: exports came out 3-4x larger than the
+# encrypted source they were copied from.
 # - Passed as ATTACH's STORAGE_VERSION only when the file is created: a file's
 #   format is fixed for life, and duckdb refuses to open an existing file with
 #   a lower requested version ("cannot be lowered").
@@ -54,9 +62,9 @@ _CATALOG = "pkg"
 #   requested (and v1.0.0 is rejected outright alongside ENCRYPTION_KEY). They
 #   never travel anyway — only the plain export does.
 # Verified on duckdb 1.4.0, 1.4.5, 1.5.4 and 2.0.0. Unverified beyond 2.0.0: a
-# future duckdb dropping the v1.0.0 format would surface as a StorageError (see
+# future duckdb dropping the pinned format would surface as a StorageError (see
 # _storage_version_error), never as a silently newer file.
-STORAGE_VERSION = "v1.0.0"
+STORAGE_VERSION = "v1.2.0"
 DUCKDB_VERIFIED_UP_TO = "2.0.0"
 
 # TS Events caption -> history.events column. Captions MUST stay in sync with
@@ -164,6 +172,7 @@ class PackageStore:
         self.path = Path(path)
         self._key = encryption_key or None
         self._con: duckdb.DuckDBPyConnection | None = None
+        self._known_luids: set[str] | None = None  # identity.map cache, see known_luids()
 
     # -- lifecycle -----------------------------------------------------------
 
@@ -196,6 +205,7 @@ class PackageStore:
             raise StorageError(f"Cannot open '{self.path}': {exc}") from exc
         con.execute(f"USE {_CATALOG}")
         self._con = con
+        self._known_luids = None
         self._ensure_schema()
         return self
 
@@ -476,6 +486,8 @@ class PackageStore:
             "INSERT INTO identity.map VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             [pseudonym, user_luid, name, full_name, email, external_auth_user_id, run_id, run_id],
         )
+        if self._known_luids is not None:
+            self._known_luids.add(user_luid)
         return pseudonym
 
     def resolve(self, pseudonym: str) -> dict[str, Any] | None:
@@ -487,10 +499,16 @@ class PackageStore:
         columns = [d[0] for d in cur.description]
         return dict(zip(columns, row, strict=True))
 
-    def known_luids(self) -> set[str]:
-        """All user LUIDs ever seen — the safety net checks payloads against these."""
-        rows = self.con.execute("SELECT user_luid FROM identity.map").fetchall()
-        return {r[0] for r in rows}
+    def known_luids(self) -> AbstractSet[str]:
+        """All user LUIDs ever seen — the safety net checks payloads against these.
+
+        Read once per open store, then kept current by ``upsert_identity`` (the
+        only writer of identity.map): the safety net asks on every landed page.
+        """
+        if self._known_luids is None:
+            rows = self.con.execute("SELECT user_luid FROM identity.map").fetchall()
+            self._known_luids = {r[0] for r in rows}
+        return self._known_luids
 
     def pseudonym_by_email(self, email: str) -> str | None:
         """Reverse vault lookup (case-insensitive) for sources that carry only
@@ -536,12 +554,15 @@ class PackageStore:
 
     def _assert_export_table_clean(self, schema: str, table: str) -> None:
         """Abort if an exported table holds an e-mail-shaped string or a known
-        user LUID. ``to_json(t)`` serialises the whole row — every column, nested
-        JSON payloads included — so the scan covers all fields, not just raw."""
+        user LUID. ``t::VARCHAR`` renders the whole row — every column, nested
+        values and JSON payloads included — so the scan covers all fields, not
+        just raw. JSON payloads stay the text tca stored (the representation the
+        write-time safety net scanned); ``to_json(t)`` re-parsed every payload
+        into a document and needed > 4 GB for a 500 MB raw table."""
         qualified = f'exp."{schema}"."{table}" t'
         emails = self.con.execute(
             f"SELECT count(*) FROM {qualified} "
-            r"WHERE regexp_matches(to_json(t)::VARCHAR, "
+            r"WHERE regexp_matches(t::VARCHAR, "
             r"'[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}')"
         ).fetchone()
         assert emails is not None
@@ -551,12 +572,25 @@ class PackageStore:
                 f"'{schema}.{table}' contain an e-mail-shaped string. "
                 "The export was NOT produced."
             )
-        # UUID-shaped guard: a degenerate vault token (e.g. "NA") can never make
-        # this substring scan pathological — matches the safety net.
+        # One pass + a hash join instead of rows × users substring searches:
+        # every UUID-shaped substring lies inside a maximal run of hex digits and
+        # dashes, so each 36-char window of each run is compared with the vault —
+        # overlapping occurrences included, like the safety net. UUID-shaped
+        # guard: a degenerate vault token (e.g. "NA") can never match.
         luids = self.con.execute(
-            f"SELECT count(*) FROM {qualified} WHERE EXISTS ("
-            "  SELECT 1 FROM identity.map i "
-            "  WHERE length(i.user_luid) = 36 AND contains(to_json(t)::VARCHAR, i.user_luid))"
+            f"""
+            WITH runs AS (
+                SELECT row_number() OVER () AS row_id,
+                       unnest(regexp_extract_all(t::VARCHAR, '[0-9a-fA-F-]{{36,}}')) AS run
+                FROM {qualified}
+            ), windows AS (
+                SELECT row_id, substr(run, unnest(range(1, length(run) - 34)), 36) AS window
+                FROM runs
+            )
+            SELECT count(DISTINCT w.row_id)
+            FROM windows w JOIN identity.map i ON w.window = i.user_luid
+            WHERE regexp_full_match(i.user_luid, '{_LUID_PATTERN}')
+            """
         ).fetchone()
         assert luids is not None
         if int(luids[0]) > 0:

@@ -208,10 +208,41 @@ def run_module(client: RestClient, store: PackageStore):
     return PermissionsModule().run(ctx)
 
 
+def test_personal_space_workbooks_are_not_queried(httpx_mock: HTTPXMock, connected) -> None:
+    # Tableau refuses them (403, then 500): asking cost the full retry backoff
+    # per workbook, and three in a row aborted the run
+    client, store = connected
+    personal = {"type": "PersonalSpace", "name": "Personal Space"}
+    httpx_mock.add_response(
+        url=f"{API}/projects?pageSize=1000&pageNumber=1", json=page("projects", "project", [])
+    )
+    httpx_mock.add_response(
+        url=f"{API}/workbooks?fields=_all_&pageSize=1000&pageNumber=1",
+        json=page(
+            "workbooks",
+            "workbook",
+            [{"id": f"wb-p{i}", "location": {"id": f"ps-{i}", **personal}} for i in range(1, 4)]
+            + [{"id": "wb-ok", "location": {"id": "p-1", "type": "Project"}}],
+        ),
+    )
+    httpx_mock.add_response(
+        url=f"{API}/datasources?fields=_all_&pageSize=1000&pageNumber=1",
+        json=page("datasources", "datasource", []),
+    )
+    succeed(httpx_mock, "wb-ok")  # any other permissions call fails: unmocked
+
+    stats = run_module(client, store)
+
+    assert stats.personal_space == 3
+    assert stats.pages["/workbooks/{luid}/permissions"] == 1
+    assert stats.denied == [] and stats.failed == []
+
+
 def test_persistent_5xx_on_single_item_is_skipped_not_fatal(
     httpx_mock: HTTPXMock, connected
 ) -> None:
     # seen live: a Personal Space workbook answering 500 to its permissions query
+    # (those are no longer queried; the 5xx skip stays for any other item)
     client, store = connected
     mock_workbook_listings(httpx_mock, "wb-personal", "wb-ok")
     fail_every_attempt(httpx_mock, "wb-personal")

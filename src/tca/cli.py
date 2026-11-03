@@ -372,6 +372,7 @@ def collect(
                 skipped = 0
                 denied: list[tuple[str, str]] = []
                 failed: list[tuple[str, str]] = []
+                personal_space = 0
                 try:
                     with progress:
                         for module in selected:
@@ -381,6 +382,7 @@ def collect(
                             skipped += stats.skipped
                             denied.extend(stats.denied)
                             failed.extend(stats.failed)
+                            personal_space += stats.personal_space
                 except KeyboardInterrupt:
                     store.finish_run(run_id, "partial", notes="interrupted by user")
                     console.print(
@@ -400,10 +402,12 @@ def collect(
 
                 failed_calls = [endpoint.replace("{luid}", luid) for endpoint, luid in failed]
                 notes_parts = []
-                if denied:
+                if personal_space:
                     notes_parts.append(
-                        f"{len(denied)} item(s) denied (403/404), e.g. Personal Space content"
+                        f"{personal_space} Personal Space workbook(s): permissions not queried"
                     )
+                if denied:
+                    notes_parts.append(f"{len(denied)} item(s) denied (403/404)")
                 if failed:
                     shown = ", ".join(failed_calls[:5]) + (", …" if len(failed) > 5 else "")
                     notes_parts.append(
@@ -418,11 +422,16 @@ def collect(
                     )
                 if skipped:
                     console.print(f"[dim]{skipped} already-collected pages skipped (resume)[/dim]")
+                if personal_space:
+                    console.print(
+                        f"[dim]{personal_space} Personal Space workbook(s): permissions "
+                        "not queried (that content cannot be shared, and Tableau "
+                        "refuses the call)[/dim]"
+                    )
                 if denied:
                     console.print(
                         f"[yellow]⚠ {len(denied)} item(s) refused the query "
-                        "(403/404) and were skipped — typical for Personal Space "
-                        "content; recorded in the run notes.[/yellow]"
+                        "(403/404) and were skipped; recorded in the run notes.[/yellow]"
                     )
                 if failed:
                     console.print(
@@ -879,7 +888,8 @@ def export(
         with PackageStore(cfg.database_path, db_key()) as store:
             counts = store.export_redacted(dest)
 
-        digest = hashlib.sha256(dest.read_bytes()).hexdigest()
+        with dest.open("rb") as exported:  # streamed: the export can be GBs
+            digest = hashlib.file_digest(exported, "sha256").hexdigest()
         checksum_path = Path(f"{dest}.sha256")
         checksum_path.write_text(f"{digest}  {dest.name}\n", encoding="utf-8")
 

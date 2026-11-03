@@ -88,12 +88,16 @@ The DuckDB opening the file is **older than the one that wrote it**. A
 DuckDB file's storage format is fixed for life when the file is created, and
 older readers cannot open newer formats. `tca diagnostics` shows both sides
 at a glance: the collector's duckdb version and the file's storage format
-(`duckdb 2.0.0 (file storage v1.0.0+)`).
+(`duckdb 2.0.0 (file storage v1.2.0+)`).
 
-- **Exports and unencrypted package files** are created in the `v1.0.0`
-  format, readable by any DuckDB ≥ 1.0, whichever duckdb the collector runs
-  on. Collector releases up to 0.2.0 did not pin the format, so on duckdb 2.x
-  they wrote files only DuckDB ≥ 2.0 can read. For an export, update the
+- **Exports and unencrypted package files** are created in the `v1.2.0`
+  format, readable by any DuckDB ≥ 1.2 (February 2025), whichever duckdb the
+  collector runs on. A DuckDB 1.0 or 1.1 reader stops with `Trying to read a
+  database file with version number 65, but we can only read version 64`:
+  update it. Collector releases 0.2.1–0.2.3 used `v1.0.0` (readable by ≥ 1.0,
+  but with the raw JSON stored uncompressed, 3-4x larger); releases up to
+  0.2.0 did not pin the format, so on duckdb 2.x they wrote files only
+  DuckDB ≥ 2.0 can read. For an export, update the
   collector and run `tca export` again: every export is a new file, so it
   gets the portable format. An existing package file keeps its format: open
   it with a DuckDB at least as new as the one that created it.
@@ -131,18 +135,25 @@ continues the interrupted run, skipping what was collected — including the
 per-item API calls. A new `tca collect` (without `--resume`) instead starts a
 fresh run and marks the interrupted one `aborted`.
 
+### "N Personal Space workbook(s): permissions not queried"
+
+Expected, informational. Personal Space content cannot be shared, so it has no
+explicit permission rules, and Tableau Cloud refuses the permissions query on
+it even to site administrators. The collector recognises those workbooks from
+the workbook listing and skips the call; the count goes in the run notes.
+
 ### "⚠ N item(s) refused the query (403/404) and were skipped"
 
-Expected. Some content — typically **Personal Space** workbooks — refuses
-permission queries even to site administrators. The items are counted in the
-run notes and skipped; everything else proceeds.
+Expected. Some content refuses its query even to site administrators. The
+items are counted in the run notes and skipped; everything else proceeds.
 
 ### "⚠ N item(s) kept failing with a server error (5xx) and were skipped"
 
 Tableau answered a per-item call (a permissions or connections query on one
 workbook or data source) with a server error on every retry. It is a fault on
 Tableau's side tied to that item — seen live on a **Personal Space** workbook,
-which answered `500` instead of `403` — so the collector skips it, lists the
+which answered `500` instead of `403` (those are no longer queried at all) —
+so the collector skips it, lists the
 failed calls under the warning and in the run notes, and finishes the run.
 Skipped items are not stored, so the next `tca collect` asks for them again.
 

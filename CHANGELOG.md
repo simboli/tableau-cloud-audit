@@ -10,6 +10,41 @@ test). Schema versions are tracked independently in `meta.schema_migrations`.
 
 ## [Unreleased]
 
+Found by a synthetic-scale benchmark (a fake Tableau Cloud from 200 to 2,000
+users): the collector's own cost, not the API's, dominated large sites.
+
+### Changed
+
+- **Exports are 3-4x smaller.** Exports and unencrypted package files are now
+  created in DuckDB's `v1.2.0` storage format instead of `v1.0.0`: it is the
+  first format that compresses long strings, and the raw JSON pages — most of
+  the file — were stored uncompressed. A benchmark export went from 63.7 to
+  16.8 MB. The trade-off: opening an export now needs **DuckDB ≥ 1.2**
+  (February 2025) instead of ≥ 1.0; an older reader stops with a clear
+  "version number 65 … can only read version 64" error. Existing package files
+  keep their format; every new export gets the new one.
+- **Personal Space workbooks are no longer queried for permissions.** That
+  content cannot be shared, so it has no explicit rules, and Tableau Cloud
+  refuses the call (403, and HTTP 500 since November 2026). Each refusal cost
+  the full retry backoff (~15 s), and three in a row stopped the run. They are
+  now counted and named in the console and the run notes instead.
+
+### Fixed
+
+- **The write-time safety net no longer slows down with the number of users.**
+  It searched every page once per known user LUID; it now scans each page
+  once and checks the LUID-shaped strings it finds against the vault, with the
+  same guarantee (overlapping and embedded occurrences included). On a
+  2,000-user site that was 3 minutes per run; at 30,000 users, hours.
+- **`tca export` verification scales the same way**: one scan of every table
+  plus a join against the vault, instead of one substring search per row and
+  per known user (12 minutes → 20 seconds on the 2,000-user benchmark). It
+  also needs a fraction of the memory: rows were rendered with `to_json`,
+  which re-parsed every stored JSON page and needed more than 4 GB for that
+  export; they are now scanned as the text tca stored (under 1 GB). The
+  SHA-256 of the export is computed in chunks instead of loading the whole
+  file into memory.
+
 ## [0.2.3] — 2026-11-02
 
 ### Fixed
